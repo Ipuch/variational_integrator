@@ -289,9 +289,12 @@ def main():
     biorbd_casadi_model = biorbd_casadi.Model("pendulum.bioMod")
     biorbd_model = biorbd.Model("pendulum.bioMod")
 
+    import time as t
+
     time = 3600
     time_step = 0.01
 
+    tic0 = t.time()
     # dop853 integrator
     from scipy.integrate import solve_ivp
     q0 = np.array([1.54, 1.545])
@@ -299,6 +302,9 @@ def main():
     x0 = np.hstack((q0[0], qdot0))
     fd = lambda t, x: forward_dynamics(biorbd_model, np.array([x[0]]), np.array([x[1]]), np.array([0]))
     q_rk45 = solve_ivp(fd, [0, time], x0, method='RK45', t_eval=np.arange(0, time, time_step)).y
+    tic1 = t.time()
+
+    print(tic1 - tic0)
 
     # variational integrator
     vi = VariationalIntegrator(biorbd_model=biorbd_casadi_model, time_step=time_step, time=time)
@@ -306,10 +312,13 @@ def main():
     vi.set_initial_values(q1_num=q_rk45[0, 0], q2_num=q_rk45[0, 1])
     q_vi = vi.integrate()
 
+    tic2 = t.time()
+    print(tic2 - tic1)
+
     import matplotlib.pyplot as plt
     plt.figure()
-    plt.plot(q_vi[0, :], label="Variational Integrator", color="red", linestyle="", marker="o", markersize=2)
-    plt.plot(q_rk45[0, :], label="RK45", color="blue", linestyle="", marker="o", markersize=2)
+    plt.plot(q_vi[0, :], label="Variational Integrator", color="red", linestyle="-", marker="", markersize=2)
+    plt.plot(q_rk45[0, :], label="RK45", color="blue", linestyle="-", marker="", markersize=2)
     plt.title("Generalized coordinates comparison between RK45 and variational integrator")
     plt.legend()
 
