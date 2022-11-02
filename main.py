@@ -289,7 +289,7 @@ def main():
     biorbd_casadi_model = biorbd_casadi.Model("pendulum.bioMod")
     biorbd_model = biorbd.Model("pendulum.bioMod")
 
-    time = 200
+    time = 3600
     time_step = 0.01
 
     # dop853 integrator
