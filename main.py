@@ -3,11 +3,19 @@ This script is used to integrate the motion with a variational integrator based 
 and a first order quadrature method.
 """
 
-import typing
+from enum import Enum
 import numpy as np
-from casadi import MX, SX, jacobian, Function, rootfinder
+from casadi import MX, SX, jacobian, Function, rootfinder, transpose
 import biorbd_casadi
 import biorbd
+
+
+class Models(Enum):
+    """
+    The different models
+    """
+    PENDULUM = "pendulum.bioMod"
+    DOUBLE_PENDULUM = "double_pendulum.bioMod"
 
 
 class VariationalIntegrator:
@@ -59,7 +67,7 @@ class VariationalIntegrator:
         self.residuals = Function(
             "Residuals",
             [self.q3],
-            [self.dela(q1_num, q2_num, self.q3)],
+            [transpose(self.dela(q1_num, q2_num, self.q3))],
         ).expand()
 
         # Create a implicit function instance to solve the system of equations
@@ -164,7 +172,7 @@ class VariationalIntegrator:
             q1_num = q2_num
             q2_num = q3_num
 
-            q_all[:, i] = q3_num
+            q_all[:, i] = q3_num.toarray().squeeze()
 
         return q_all
 
@@ -285,9 +293,9 @@ def discrete_total_energy(biorbd_model: biorbd.Model, q: np.ndarray, time_step) 
     return discrete_total_energy
 
 
-def main():
-    biorbd_casadi_model = biorbd_casadi.Model("pendulum.bioMod")
-    biorbd_model = biorbd.Model("pendulum.bioMod")
+def pendulum():
+    biorbd_casadi_model = biorbd_casadi.Model(Models.PENDULUM.value)
+    biorbd_model = biorbd.Model(Models.PENDULUM.value)
 
     import time as t
 
@@ -334,5 +342,70 @@ def main():
     return print("Hello World")
 
 
+def double_pendulum():
+    biorbd_casadi_model = biorbd_casadi.Model(Models.DOUBLE_PENDULUM.value)
+    biorbd_model = biorbd.Model(Models.DOUBLE_PENDULUM.value)
+
+    import time as t
+
+    time = 60
+    time_step = 0.05
+    # multistep_integrator = "RK45"  # DOP853
+    multistep_integrator = "DOP853"  # DOP853
+
+    tic0 = t.time()
+
+    from scipy.integrate import solve_ivp
+    q0 = np.array([[1.54, 1.545],
+                   [1.54, 1.545]])
+    qdot0 = (q0[:, 0] - q0[:, 1]) / time_step
+    x0 = np.hstack((q0[:, 0], qdot0))
+    fd = lambda t, x: forward_dynamics(biorbd_model, x[0:2], x[2:4], np.array([0]))
+    q_rk45 = solve_ivp(fd, [0, time], x0, method=multistep_integrator, t_eval=np.arange(0, time, time_step)).y
+    tic1 = t.time()
+
+    print(tic1 - tic0)
+
+    # variational integrator
+    vi = VariationalIntegrator(biorbd_model=biorbd_casadi_model, time_step=time_step, time=time)
+    # vi.set_initial_values(q1_num=1.54, q2_num=1.545)
+    vi.set_initial_values(q1_num=q_rk45[:2, 0], q2_num=q_rk45[:2, 1])
+    q_vi = vi.integrate()
+
+    tic2 = t.time()
+    print(tic2 - tic1)
+
+    import matplotlib.pyplot as plt
+    fig, axs = plt.subplots(2, 1)
+    axs[0].plot(np.arange(0, time, time_step), q_vi[0, :], label="Variational Integrator", color="red", linestyle="-",
+                marker="", markersize=2)
+    axs[0].plot(np.arange(0, time, time_step), q_rk45[0, :], label=multistep_integrator, color="blue", linestyle="-", marker="",
+                markersize=2)
+    axs[0].set_title("q1")
+    axs[0].legend()
+    axs[1].plot(np.arange(0, time, time_step), q_vi[1, :], label="Variational Integrator", color="red", linestyle="-",
+                marker="", markersize=2)
+    axs[1].plot(np.arange(0, time, time_step), q_rk45[1, :], label=multistep_integrator, color="blue", linestyle="-", marker="",
+                markersize=2)
+    axs[1].set_title("q2")
+    axs[1].legend()
+
+    # plot total energy for both methods
+    plt.figure()
+    plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step), label="Variational Integrator", color="red")
+    plt.plot(total_energy(biorbd_model, q_rk45[0, :], q_rk45[1, :]), label=multistep_integrator, color="blue")
+    plt.title("Total energy comparison between RK45 and variational integrator")
+    plt.legend()
+
+    plt.show()
+
+    import bioviz
+    b = bioviz.Viz(Models.DOUBLE_PENDULUM.value)
+    b.load_movement(q_vi)
+    b.exec()
+    return print("Hello World")
+
+
 if __name__ == "__main__":
-    main()
+    # pendulum()
+    double_pendulum()
