@@ -2,7 +2,6 @@
 This script is used to integrate the motion with a variational integrator based on the discrete Lagrangian,
 and a first order quadrature method.
 """
-from typing import Callable, Tuple
 from enum import Enum
 import numpy as np
 from casadi import MX, SX, jacobian, Function, rootfinder, transpose, vertcat
@@ -200,12 +199,12 @@ class VariationalIntegrator:
         -------
         The discrete Euler-Lagrange equations
         """
-        D2_Ld_q1_q2 = jacobian(self.discrete_lagrangian(q1, q2), q2)
-        D1_Ld_q2_q3 = jacobian(self.discrete_lagrangian(q2, q3), q2)
+        D2_Ld_q1_q2 = transpose(jacobian(self.discrete_lagrangian(q1, q2), q2))
+        D1_Ld_q2_q3 = transpose(jacobian(self.discrete_lagrangian(q2, q3), q2))
         if self.constraints is None:
-            return transpose(D2_Ld_q1_q2 + D1_Ld_q2_q3)
+            return D2_Ld_q1_q2 + D1_Ld_q2_q3
         else:
-            return transpose(D2_Ld_q1_q2 + D1_Ld_q2_q3) - transpose(self.jac(q2)) @ self.lambdas
+            return D2_Ld_q1_q2 + D1_Ld_q2_q3 - transpose(self.jac(q2)) @ self.lambdas
 
     def set_initial_values(self, q1_num, q2_num):
         """
