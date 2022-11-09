@@ -17,7 +17,17 @@ class Models(Enum):
     PENDULUM = "pendulum.bioMod"
     DOUBLE_PENDULUM = "double_pendulum.bioMod"
     TWO_PENDULUMS = "two_pendulums.bioMod"
+    ONE_PENDULUM = "one_pendulum.bioMod"
 
+
+class DiscreteLagrangian(Enum):
+    """
+    The different discrete methods
+    """
+    MIDPOINT = "midpoint"
+    LEFT_APPROXIMATION = "left_approximation"
+    RIGHT_APPROXIMATION = "right_approximation"
+    TRAPEZOIDAL = "trapezoidal"
 
 class VariationalIntegrator:
     """
@@ -36,12 +46,14 @@ class VariationalIntegrator:
     jac: Callable
         The jacobian of the constraints of the system only one callable for now
     """
+
     def __init__(self,
                  biorbd_model: biorbd_casadi.Model,
                  time_step: float,
                  time: float,
                  constraints: Function = None,
                  jac: Function = None,
+                 discrete_lagrangian_approximation: DiscreteLagrangian = DiscreteLagrangian.MIDPOINT,
                  ):
 
         self.biorbd_model = biorbd_model
@@ -49,6 +61,7 @@ class VariationalIntegrator:
         self.time = time
         self.constraints = constraints
         self.jac = jac
+        self.discrete_lagrangian_approximation = discrete_lagrangian_approximation
 
         self._declare_mx()
         self._declare_discrete_euler_lagrange_equations()
@@ -71,22 +84,32 @@ class VariationalIntegrator:
         """
         self.dela = Function(
             "DEL",
-            [self.q1, self.q2, self.q3, self.lambdas],
-            [self.discrete_euler_lagrange_equations(self.q1, self.q2, self.q3, self.lambdas)],
+            [self.q1, self.q2, self.q3, self.lambdas] if self.constraints is not None else [self.q1, self.q2, self.q3],
+            [self.discrete_euler_lagrange_equations(self.q1, self.q2, self.q3, self.lambdas)] if self.constraints is not None else [self.discrete_euler_lagrange_equations(self.q1, self.q2, self.q3)],
         ).expand()
 
     def _declare_residuals(self, q1_num, q2_num):
 
-        mx_residuals = vertcat(
-            self.dela(q1_num, q2_num, self.q3, self.lambdas),
-            self.constraints(self.q3),
-        )
+        if self.constraints is None:
+            mx_residuals = self.dela(q1_num, q2_num, self.q3)
 
-        self.residuals = Function(
-            "Residuals",
-            [vertcat(self.q3, self.lambdas)],
-            [mx_residuals],
-        ).expand()
+            self.residuals = Function(
+                "Residuals",
+                [vertcat(self.q3)],
+                [mx_residuals],
+            ).expand()
+
+        else:
+            mx_residuals = vertcat(
+                self.dela(q1_num, q2_num, self.q3, self.lambdas),
+                self.constraints(self.q3),
+            )
+
+            self.residuals = Function(
+                "Residuals",
+                [vertcat(self.q3, self.lambdas)],
+                [mx_residuals],
+            ).expand()
 
         # Create a implicit function instance to solve the system of equations
         opts = {}
@@ -128,11 +151,27 @@ class VariationalIntegrator:
         -------
         The discrete Lagrangian
         """
-        q_middle = (q1 + q2) / 2
-        qdot_middle = (q2 - q1) / self.time_step
-        return self.time_step * self.lagrangian(q_middle, qdot_middle)
+        if self.discrete_lagrangian_approximation == DiscreteLagrangian.MIDPOINT:
+            q_discrete = (q1 + q2) / 2
+            qdot_discrete = (q2 - q1) / self.time_step
+            return MX(self.time_step) * self.lagrangian(q_discrete, qdot_discrete)
+        elif self.discrete_lagrangian_approximation == DiscreteLagrangian.LEFT_APPROXIMATION:
+            q_discrete = q1
+            qdot_discrete = (q2 - q1) / self.time_step
+            return MX(self.time_step) * self.lagrangian(q_discrete, qdot_discrete)
+        elif self.discrete_lagrangian_approximation == DiscreteLagrangian.RIGHT_APPROXIMATION:
+            q_discrete = q2
+            qdot_discrete = (q2 - q1) / self.time_step
+            return MX(self.time_step) * self.lagrangian(q_discrete, qdot_discrete)
+        elif self.discrete_lagrangian_approximation == DiscreteLagrangian.TRAPEZOIDAL:
+            # from : M. West, “Variational integrators,” Ph.D. dissertation, California Inst.
+            # Technol., Pasadena, CA, 2004. p 13
+            qdot_discrete = (q2 - q1) / self.time_step
+            return MX(self.time_step)/2 * (self.lagrangian(q1, qdot_discrete) + self.lagrangian(q2, qdot_discrete))
+        else:
+            raise NotImplementedError(f"Discrete Lagrangian {self.discrete_lagrangian_approximation} is not implemented")
 
-    def discrete_euler_lagrange_equations(self, q1: MX | SX, q2: MX | SX, q3: MX | SX, lambdas: MX | SX) -> MX | SX:
+    def discrete_euler_lagrange_equations(self, q1: MX | SX, q2: MX | SX, q3: MX | SX, lambdas: MX | SX = None) -> MX | SX:
         """
         Compute the discrete Euler-Lagrange equations of a biorbd model
 
@@ -187,6 +226,8 @@ class VariationalIntegrator:
         if self.constraints is not None:
             lambdas_all = np.zeros((self.constraints.nnz_out(), n_frames))
             lambdas_num = lambdas_all[:, 0]
+        else:
+            lambdas_all = None
 
         for i in range(2, int(self.time / self.time_step)):
 
@@ -205,7 +246,9 @@ class VariationalIntegrator:
             q1_num = q2_num
             q2_num = q3_num
 
-            lambdas_all[:, i] = lambdas_num.toarray().squeeze()
+            if self.constraints is not None:
+                lambdas_all[:, i] = lambdas_num.toarray().squeeze()
+
             q_all[:, i] = q3_num.toarray().squeeze()
 
         return q_all, lambdas_all
@@ -336,22 +379,27 @@ def pendulum():
     time = 600
     time_step = 0.01
 
+    multistep_integrator = "DOP853"  # DOP853
+
     tic0 = t.time()
     # dop853 integrator
     from scipy.integrate import solve_ivp
-    q0 = np.array([1.54, 1.545])
+    q0 = np.array([1.54, 1.54])
     qdot0 = (q0[1] - q0[0]) / time_step
     x0 = np.hstack((q0[0], qdot0))
     fd = lambda t, x: forward_dynamics(biorbd_model, np.array([x[0]]), np.array([x[1]]), np.array([0]))
-    q_rk45 = solve_ivp(fd, [0, time], x0, method='RK45', t_eval=np.arange(0, time, time_step)).y
+    q_rk45 = solve_ivp(fd, [0, time], x0, method=multistep_integrator, t_eval=np.arange(0, time, time_step)).y
+    from ode_solvers import RK4
+    q_rk4 = RK4(np.arange(0, time, time_step), fd, x0)
+
     tic1 = t.time()
 
     print(tic1 - tic0)
 
     # variational integrator
     vi = VariationalIntegrator(biorbd_model=biorbd_casadi_model, time_step=time_step, time=time)
-    # vi.set_initial_values(q1_num=1.54, q2_num=1.545)
-    vi.set_initial_values(q1_num=q_rk45[0, 0], q2_num=q_rk45[0, 1])
+    vi.set_initial_values(q1_num=1.54, q2_num=1.54)
+    # vi.set_initial_values(q1_num=q_rk45[0, 0], q2_num=q_rk45[0, 1])
     q_vi, _ = vi.integrate()
 
     tic2 = t.time()
@@ -359,15 +407,17 @@ def pendulum():
 
     import matplotlib.pyplot as plt
     plt.figure()
-    plt.plot(q_vi[0, :], label="Variational Integrator", color="red", linestyle="-", marker="", markersize=2)
-    plt.plot(q_rk45[0, :], label="RK45", color="blue", linestyle="-", marker="", markersize=2)
+    plt.plot(q_vi[0, 1:], label="Variational Integrator", color="red", linestyle="-", marker="", markersize=2)
+    plt.plot(q_rk45[0, 0:-1], label=multistep_integrator, color="blue", linestyle="-", marker="", markersize=2)
+    plt.plot(q_rk4[0, 0:-1], label="RK4", color="green", linestyle="-", marker="", markersize=2)
     plt.title("Generalized coordinates comparison between RK45 and variational integrator")
     plt.legend()
 
     # plot total energy for both methods
     plt.figure()
     plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step), label="Variational Integrator", color="red")
-    plt.plot(total_energy(biorbd_model, q_rk45[0, :], q_rk45[1, :]), label="RK45", color="blue")
+    plt.plot(total_energy(biorbd_model, q_rk45[0, :], q_rk45[1, :]), label=multistep_integrator, color="blue")
+    plt.plot(total_energy(biorbd_model, q_rk4[0, :], q_rk4[1, :]), label="RK4", color="green")
     plt.title("Total energy comparison between RK45 and variational integrator")
     plt.legend()
 
@@ -396,6 +446,9 @@ def double_pendulum():
     x0 = np.hstack((q0[:, 0], qdot0))
     fd = lambda t, x: forward_dynamics(biorbd_model, x[0:2], x[2:4], np.array([0]))
     q_rk45 = solve_ivp(fd, [0, time], x0, method=multistep_integrator, t_eval=np.arange(0, time, time_step)).y
+    from ode_solvers import RK4
+    q_rk4 = RK4(np.arange(0, time, time_step), fd, x0)
+
     tic1 = t.time()
 
     print(tic1 - tic0)
@@ -415,11 +468,15 @@ def double_pendulum():
                 marker="", markersize=2)
     axs[0].plot(np.arange(0, time, time_step), q_rk45[0, :], label=multistep_integrator, color="blue", linestyle="-", marker="",
                 markersize=2)
+    axs[0].plot(np.arange(0, time, time_step), q_rk4[0, :], label="RK4", color="green", linestyle="-", marker="",
+                markersize=2)
     axs[0].set_title("q1")
     axs[0].legend()
     axs[1].plot(np.arange(0, time, time_step), q_vi[1, :], label="Variational Integrator", color="red", linestyle="-",
                 marker="", markersize=2)
     axs[1].plot(np.arange(0, time, time_step), q_rk45[1, :], label=multistep_integrator, color="blue", linestyle="-", marker="",
+                markersize=2)
+    axs[1].plot(np.arange(0, time, time_step), q_rk4[1, :], label="RK4", color="green", linestyle="-", marker="",
                 markersize=2)
     axs[1].set_title("q2")
     axs[1].legend()
@@ -428,6 +485,7 @@ def double_pendulum():
     plt.figure()
     plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step), label="Variational Integrator", color="red")
     plt.plot(total_energy(biorbd_model, q_rk45[0, :], q_rk45[1, :]), label=multistep_integrator, color="blue")
+    plt.plot(total_energy(biorbd_model, q_rk4[0, :], q_rk4[1, :]), label="RK4", color="green")
     plt.title("Total energy comparison between RK45 and variational integrator")
     plt.legend()
 
@@ -446,7 +504,7 @@ def two_pendulum():
 
     import time as t
 
-    time = 600
+    time = 10
     time_step = 0.05
 
     tic0 = t.time()
@@ -522,7 +580,87 @@ def two_pendulum():
     return print("Hello World")
 
 
+def one_pendulum():
+    biorbd_casadi_model = biorbd_casadi.Model(Models.ONE_PENDULUM.value)
+    biorbd_model = biorbd.Model(Models.ONE_PENDULUM.value)
+
+    import time as t
+
+    time = 10
+    time_step = 0.05
+
+    tic0 = t.time()
+
+    q_t0 = np.array([1.54])
+    q_t1 = np.array([1.545])
+
+    all_q_t0 = np.array([0, 0, q_t0[0]])
+    all_q_t1 = np.array([0, 0, q_t1[0]])
+
+    # build  constraint
+    # the origin of the second pendulum is constrained to the tip of the first pendulum
+    q_sym = MX.sym("q", (biorbd_casadi_model.nbQ(), 1))
+    constraint = biorbd_casadi_model.markers(q_sym)[0].to_mx()[1:] - MX.zeros((2, 1))
+    fcn_constraint = Function("constraint", [q_sym], [constraint], ["q"], ["constraint"]).expand()
+    fcn_jacobian = Function("jacobian", [q_sym], [jacobian(constraint, q_sym)], ["q"], ["jacobian"]).expand()
+
+    # test the constraint
+    print(fcn_constraint(all_q_t0))
+
+    # variational integrator
+    vi = VariationalIntegrator(
+        biorbd_model=biorbd_casadi_model,
+        time_step=time_step,
+        time=time,
+        constraints=fcn_constraint,
+        jac=fcn_jacobian,
+        discrete_lagrangian_approximation=DiscreteLagrangian.TRAPEZOIDAL,
+                               )
+    # vi.set_initial_values(q1_num=1.54, q2_num=1.545)
+    vi.set_initial_values(q1_num=all_q_t0, q2_num=all_q_t1)
+    q_vi, lambdas_vi = vi.integrate()
+
+    tic2 = t.time()
+    print(tic2 - tic0)
+
+    import matplotlib.pyplot as plt
+    fig, axs = plt.subplots(3, 2)
+    axs[0, 0].plot(np.arange(0, time, time_step), q_vi[0, :], label="Variational Integrator", color="red", linestyle="-")
+    axs[1, 0].plot(np.arange(0, time, time_step), q_vi[1, :], label="Variational Integrator", color="red", linestyle="-")
+    axs[2, 0].plot(np.arange(0, time, time_step), q_vi[2, :], label="Variational Integrator", color="red", linestyle="-")
+    axs[0, 1].plot(np.arange(0, time, time_step), lambdas_vi[0, :], label="Variational Integrator", color="red", linestyle="-")
+    axs[1, 1].plot(np.arange(0, time, time_step), lambdas_vi[1, :], label="Variational Integrator", color="red", linestyle="-")
+
+    axs[0, 0].set_title("q1")
+    axs[1, 0].set_title("q2")
+    axs[2, 0].set_title("q3")
+    axs[0, 1].set_title("lambda1")
+    axs[1, 1].set_title("lambda2")
+    axs[0, 0].legend()
+
+    # plot total energy for both methods
+    plt.figure()
+    plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step), label="Variational Integrator", color="red")
+    plt.title("Total energy comparison between RK45 and variational integrator")
+    plt.legend()
+
+    # verify the constraint respect
+    plt.figure()
+    plt.plot(fcn_constraint(q_vi).toarray()[0, :], label="Variational Integrator", color="red")
+    plt.plot(fcn_constraint(q_vi).toarray()[1, :], label="Variational Integrator", color="red")
+    plt.title("Constraint respect")
+
+    plt.show()
+
+    import bioviz
+    b = bioviz.Viz(Models.ONE_PENDULUM.value)
+    b.load_movement(q_vi)
+    b.exec()
+    return print("Hello World")
+
+
 if __name__ == "__main__":
-    # pendulum()
+    pendulum()
     # double_pendulum()
-    two_pendulum()
+    # two_pendulum()
+    # one_pendulum()
