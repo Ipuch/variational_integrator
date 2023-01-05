@@ -498,6 +498,7 @@ def one_pendulum():
     b.exec()
     return print("Hello World")
 
+
 def one_pendulum_force():
     biorbd_casadi_model = biorbd_casadi.Model(Models.ONE_PENDULUM.value)
     biorbd_model = biorbd.Model(Models.ONE_PENDULUM.value)
@@ -593,7 +594,6 @@ def one_pendulum_force():
     b.load_movement(q_vi)
     b.exec()
     return print("Hello World")
-
 
 
 if __name__ == "__main__":

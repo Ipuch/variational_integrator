@@ -63,18 +63,18 @@ class VariationalIntegrator:
     """
 
     def __init__(
-            self,
-            biorbd_model: biorbd_casadi.Model,
-            time_step: float,
-            time: float,
-            q_init: np.ndarray,
-            constraints: Function = None,
-            jac: Function = None,
-            discrete_lagrangian_approximation: QuadratureRule = QuadratureRule.TRAPEZOIDAL,
-            controls: np.ndarray = None,
-            # control_type: ControlType = ControlType.CONSTANT,
-            forces: Function = None,
-            # force_approximation: QuadratureRule = QuadratureRule.TRAPEZOIDAL,
+        self,
+        biorbd_model: biorbd_casadi.Model,
+        time_step: float,
+        time: float,
+        q_init: np.ndarray,
+        constraints: Function = None,
+        jac: Function = None,
+        discrete_lagrangian_approximation: QuadratureRule = QuadratureRule.TRAPEZOIDAL,
+        controls: np.ndarray = None,
+        # control_type: ControlType = ControlType.CONSTANT,
+        forces: Function = None,
+        # force_approximation: QuadratureRule = QuadratureRule.TRAPEZOIDAL,
     ):
 
         # check q_init
@@ -168,8 +168,10 @@ class VariationalIntegrator:
         mx_residuals = self.dela(q_prev, q_cur, self.q_next, self.lambdas, control_minus, control_plus)
         decision_variables = self.q_next
 
-        if self.variational_integrator_type == VariationalIntegratorType.CONSTRAINED_DISCRETE_EULER_LAGRANGE \
-                or self.variational_integrator_type == VariationalIntegratorType.FORCED_CONSTRAINED_DISCRETE_EULER_LAGRANGE:
+        if (
+            self.variational_integrator_type == VariationalIntegratorType.CONSTRAINED_DISCRETE_EULER_LAGRANGE
+            or self.variational_integrator_type == VariationalIntegratorType.FORCED_CONSTRAINED_DISCRETE_EULER_LAGRANGE
+        ):
 
             decision_variables = vertcat(decision_variables, self.lambdas)
             mx_residuals = vertcat(mx_residuals, self.constraints(self.q_next))
@@ -312,7 +314,9 @@ class VariationalIntegrator:
         """
         return self.jac(q_cur)
 
-    def interface_discrete_euler_lagrange_equations(self, q_prev, q_cur, q_next, lambdas, control_minus, control_plus) -> MX | SX:
+    def interface_discrete_euler_lagrange_equations(
+        self, q_prev, q_cur, q_next, lambdas, control_minus, control_plus
+    ) -> MX | SX:
         if self.variational_integrator_type == VariationalIntegratorType.DISCRETE_EULER_LAGRANGE:
             return self._discrete_euler_lagrange_equations(
                 q_prev=q_prev,
@@ -344,10 +348,11 @@ class VariationalIntegrator:
                 control_plus=control_plus,
             )
         else:
-            raise NotImplementedError(f"Variational integrator type {self.variational_integrator_type} is not implemented")
+            raise NotImplementedError(
+                f"Variational integrator type {self.variational_integrator_type} is not implemented"
+            )
 
-    def _discrete_euler_lagrange_equations(
-            self, q_prev: MX | SX, q_cur: MX | SX, q_next: MX | SX) -> MX | SX:
+    def _discrete_euler_lagrange_equations(self, q_prev: MX | SX, q_cur: MX | SX, q_next: MX | SX) -> MX | SX:
         """
         Compute the discrete Euler-Lagrange equations of a biorbd model
 
@@ -369,7 +374,8 @@ class VariationalIntegrator:
         return p_current + D1_Ld_q2_q3
 
     def _constrained_discrete_euler_lagrange_equations(
-            self, q_prev: MX | SX, q_cur: MX | SX, q_next: MX | SX, lambdas: MX | SX = None) -> MX | SX:
+        self, q_prev: MX | SX, q_cur: MX | SX, q_next: MX | SX, lambdas: MX | SX = None
+    ) -> MX | SX:
         """
         Compute the discrete Euler-Lagrange equations of a biorbd model
 
@@ -392,7 +398,8 @@ class VariationalIntegrator:
         return p_current + D1_Ld_qcur_qnext - transpose(pi_current) @ lambdas
 
     def _forced_discrete_euler_lagrange_equations(
-            self, q_prev: MX | SX, q_cur: MX | SX, q_next: MX | SX, control_minus: MX | SX, control_plus: MX | SX) -> MX | SX:
+        self, q_prev: MX | SX, q_cur: MX | SX, q_next: MX | SX, control_minus: MX | SX, control_plus: MX | SX
+    ) -> MX | SX:
         """
         Compute the discrete Euler-Lagrange equations of a biorbd model
 
@@ -409,15 +416,22 @@ class VariationalIntegrator:
         control_plus: MX | SX
             The generalized forces at the second time step
         """
-        p_current = transpose(jacobian(self.discrete_lagrangian(q_prev, q_cur),
-                                       q_cur)) + control_plus  # momentum at current time step + force
+        p_current = (
+            transpose(jacobian(self.discrete_lagrangian(q_prev, q_cur), q_cur)) + control_plus
+        )  # momentum at current time step + force
         D1_Ld_qcur_qnext = transpose(jacobian(self.discrete_lagrangian(q_cur, q_next), q_cur))
 
         return p_current + D1_Ld_qcur_qnext + control_minus
 
     def _forced_constrained_discrete_euler_lagrange_equations(
-            self, q_prev: MX | SX, q_cur: MX | SX, q_next: MX | SX, control_minus: MX | SX, control_plus: MX | SX,
-            lambdas: MX | SX = None) -> MX | SX:
+        self,
+        q_prev: MX | SX,
+        q_cur: MX | SX,
+        q_next: MX | SX,
+        control_minus: MX | SX,
+        control_plus: MX | SX,
+        lambdas: MX | SX = None,
+    ) -> MX | SX:
         """
         Compute the discrete Euler-Lagrange equations of a biorbd model
 
@@ -511,7 +525,7 @@ class VariationalIntegrator:
         """
         q = v[: self.biorbd_model.nbQ()]
         if self.constraints is not None:
-            lambdas = v[self.biorbd_model.nbQ():]
+            lambdas = v[self.biorbd_model.nbQ() :]
         else:
             lambdas = None
         return q, lambdas
