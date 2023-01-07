@@ -8,7 +8,7 @@ from casadi import MX, SX, jacobian, Function, rootfinder, transpose, vertcat
 import biorbd_casadi
 import biorbd
 
-from variational_integrator import VariationalIntegrator, QuadratureRule, ControlType
+from variational_integrator import VariationalIntegrator, QuadratureRule
 
 
 class Models(Enum):
@@ -16,10 +16,10 @@ class Models(Enum):
     The different models
     """
 
-    PENDULUM = "pendulum.bioMod"
-    DOUBLE_PENDULUM = "double_pendulum.bioMod"
-    TWO_PENDULUMS = "two_pendulums.bioMod"
-    ONE_PENDULUM = "one_pendulum.bioMod"
+    PENDULUM = "models/pendulum.bioMod"
+    DOUBLE_PENDULUM = "models/double_pendulum.bioMod"
+    TWO_PENDULUMS = "models/two_pendulums.bioMod"
+    ONE_PENDULUM = "models/one_pendulum.bioMod"
 
 
 def forward_dynamics(biorbd_model: biorbd.Model, q: np.ndarray, qdot: np.ndarray, tau: np.ndarray) -> np.ndarray:
@@ -63,7 +63,7 @@ def total_energy_i(biorbd_model: biorbd.Model, q: np.ndarray, qdot: np.ndarray) 
     The total energy
     """
 
-    return biorbd_model.CalcKineticEnergy(q, qdot) + biorbd_model.CalcPotentialEnergy(q)
+    return biorbd_model.KineticEnergy(q, qdot) + biorbd_model.PotentialEnergy(q)
 
 
 def total_energy(biorbd_model: biorbd.Model, q: np.ndarray, qdot: np.ndarray) -> np.ndarray:
@@ -540,7 +540,6 @@ def one_pendulum_force():
         jac=fcn_jacobian,
         discrete_lagrangian_approximation=QuadratureRule.TRAPEZOIDAL,
         controls=tau,
-        control_type=ControlType.CONSTANT,
         q_init=np.concatenate((all_q_t0[:, np.newaxis], all_q_t1[:, np.newaxis]), axis=1),
     )
     q_vi, lambdas_vi = vi.integrate()
@@ -600,5 +599,5 @@ if __name__ == "__main__":
     # pendulum()
     # double_pendulum()
     # two_pendulum()
-    one_pendulum()
+    # one_pendulum()
     one_pendulum_force()

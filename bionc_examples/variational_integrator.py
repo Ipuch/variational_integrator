@@ -6,7 +6,8 @@ from typing import Tuple
 from enum import Enum
 import numpy as np
 from casadi import MX, SX, jacobian, Function, rootfinder, transpose, vertcat
-import biorbd_casadi
+import bionc.bionc_casadi as bionc
+from bionc.bionc_casadi import NaturalCoordinates, NaturalVelocities
 
 
 class QuadratureRule(Enum):
@@ -37,7 +38,7 @@ class VariationalIntegrator:
 
     Attributes
     ----------
-    biorbd_model: biorbd_casadi.Model
+    biomodel: biorbd_casadi.Model
         The biorbd model
     time_step: float
         The time step of the integration
@@ -55,12 +56,10 @@ class VariationalIntegrator:
 
     def __init__(
         self,
-        biorbd_model: biorbd_casadi.Model,
+        biomodel: bionc.BiomechanicalModel,
         time_step: float,
         time: float,
         q_init: np.ndarray,
-        constraints: Function = None,
-        jac: Function = None,
         discrete_lagrangian_approximation: QuadratureRule = QuadratureRule.TRAPEZOIDAL,
         controls: np.ndarray = None,
         # control_type: ControlType = ControlType.CONSTANT,
@@ -69,7 +68,7 @@ class VariationalIntegrator:
     ):
 
         # check q_init
-        if q_init.shape[0] != biorbd_model.nbQ():
+        if q_init.shape[0] != biomodel.nb_Q:
             raise RuntimeError("q_init must have the same number of rows as the number of degrees of freedom")
         if q_init.shape[1] != 2:
             raise RuntimeError("q_init must have two columns, one q0 and one q1")
@@ -77,18 +76,18 @@ class VariationalIntegrator:
         self.q1_num = q_init[:, 0]
         self.q2_num = q_init[:, 1]
 
-        self.biorbd_model = biorbd_model
+        self.biomodel = biomodel
         self.time_step = time_step
         self.time = time
         self.nb_steps = int(time / time_step)
 
-        self.constraints = constraints
-        self.jac = jac
+        self.constraints = biomodel.holonomic_constraints
+        self.jac = biomodel.holonomic_constraints_jacobian
         self.discrete_lagrangian_approximation = discrete_lagrangian_approximation
 
         if controls is None:
-            controls = np.zeros((self.biorbd_model.nbQ(), self.nb_steps))
-        elif controls.shape[0] != self.biorbd_model.nbQ():
+            controls = np.zeros((self.biomodel.nb_Q, self.nb_steps))
+        elif controls.shape[0] != self.biomodel.nb_Q:
             raise ValueError("The control must be of the same size as the number of degrees of freedom")
         elif controls.shape[1] != self.time / self.time_step:
             raise ValueError("The control must have the same number of time steps as the time of the simulation")
@@ -97,13 +96,13 @@ class VariationalIntegrator:
         # self._controls_to_force_func()
 
         # Check the type of variational integrator
-        if controls is None and forces is None and constraints is None:
+        if controls is None and forces is None and self.constraints is None:
             self.variational_integrator_type = VariationalIntegratorType.DISCRETE_EULER_LAGRANGE
-        elif controls is None and forces is None and constraints is not None:
+        elif controls is None and forces is None and self.constraints is not None:
             self.variational_integrator_type = VariationalIntegratorType.CONSTRAINED_DISCRETE_EULER_LAGRANGE
-        elif (controls is not None or forces is None) and constraints is None:
+        elif (controls is not None or forces is None) and self.constraints is None:
             self.variational_integrator_type = VariationalIntegratorType.FORCED_DISCRETE_EULER_LAGRANGE
-        elif (controls is not None or forces is None) and constraints is not None:
+        elif (controls is not None or forces is None) and self.constraints is not None:
             self.variational_integrator_type = VariationalIntegratorType.FORCED_CONSTRAINED_DISCRETE_EULER_LAGRANGE
         else:
             raise RuntimeError("The variational integrator type is not recognized")
@@ -118,17 +117,17 @@ class VariationalIntegrator:
         Declare the MX variables
         """
         # declare q for each time step of the integration
-        self.q_prev = MX.sym("q_prev", self.biorbd_model.nbQ(), 1)  # ti-1
-        self.q_cur = MX.sym("q_cur", self.biorbd_model.nbQ(), 1)  # ti
-        self.q_next = MX.sym("q_next", self.biorbd_model.nbQ(), 1)  # ti+1
+        self.q_prev = NaturalCoordinates(MX.sym("q_prev", self.biomodel.nb_Q, 1))  # ti-1
+        self.q_cur = NaturalCoordinates(MX.sym("q_cur", self.biomodel.nb_Q, 1))  # ti
+        self.q_next = NaturalCoordinates(MX.sym("q_next", self.biomodel.nb_Q, 1))  # ti+1
         # declare lambda for each constraint
         if self.constraints is not None:
-            self.lambdas = MX.sym("lambda", self.constraints.nnz_out(), 1)
+            self.lambdas = MX.sym("lambda", self.biomodel.nb_holonomic_constraints, 1)
         else:
             self.lambdas = MX.sym("lambda", (0, 0))
 
-        self.control_minus = MX.sym("control_minus", self.biorbd_model.nbQ(), 1)
-        self.control_plus = MX.sym("control_plus", self.biorbd_model.nbQ(), 1)
+        self.control_minus = MX.sym("control_minus", self.biomodel.nb_Q, 1)
+        self.control_plus = MX.sym("control_plus", self.biomodel.nb_Q, 1)
 
     def _declare_discrete_euler_lagrange_equations(self):
         """
@@ -180,24 +179,6 @@ class VariationalIntegrator:
 
         return ifcn
 
-    def lagrangian(self, q: MX | SX, qdot: MX | SX) -> MX | SX:
-        """
-        Compute the Lagrangian of a biorbd model
-
-        Parameters
-        ----------
-        q: MX | SX
-            The generalized coordinates
-        qdot: MX | SX
-            The generalized velocities
-
-        Returns
-        -------
-        The Lagrangian
-        """
-
-        return self.biorbd_model.KineticEnergy(q, qdot).to_mx() - self.biorbd_model.PotentialEnergy(q).to_mx()
-
     def discrete_lagrangian(self, q1: MX | SX, q2: MX | SX) -> MX | SX:
         """
         Compute the discrete Lagrangian of a biorbd model
@@ -215,21 +196,21 @@ class VariationalIntegrator:
         """
         if self.discrete_lagrangian_approximation == QuadratureRule.MIDPOINT:
             q_discrete = (q1 + q2) / 2
-            qdot_discrete = (q2 - q1) / self.time_step
-            return MX(self.time_step) * self.lagrangian(q_discrete, qdot_discrete)
+            qdot_discrete = NaturalVelocities((q2 - q1) / self.time_step)
+            return MX(self.time_step) * self.biomodel.lagrangian(q_discrete, qdot_discrete)
         elif self.discrete_lagrangian_approximation == QuadratureRule.LEFT_APPROXIMATION:
             q_discrete = q1
-            qdot_discrete = (q2 - q1) / self.time_step
-            return MX(self.time_step) * self.lagrangian(q_discrete, qdot_discrete)
+            qdot_discrete = NaturalVelocities((q2 - q1) / self.time_step)
+            return MX(self.time_step) * self.biomodel.lagrangian(q_discrete, qdot_discrete)
         elif self.discrete_lagrangian_approximation == QuadratureRule.RIGHT_APPROXIMATION:
             q_discrete = q2
-            qdot_discrete = (q2 - q1) / self.time_step
-            return MX(self.time_step) * self.lagrangian(q_discrete, qdot_discrete)
+            qdot_discrete = NaturalVelocities((q2 - q1) / self.time_step)
+            return MX(self.time_step) * self.biomodel.lagrangian(q_discrete, qdot_discrete)
         elif self.discrete_lagrangian_approximation == QuadratureRule.TRAPEZOIDAL:
             # from : M. West, “Variational integrators,” Ph.D. dissertation, California Inst.
             # Technol., Pasadena, CA, 2004. p 13
-            qdot_discrete = (q2 - q1) / self.time_step
-            return MX(self.time_step) / 2 * (self.lagrangian(q1, qdot_discrete) + self.lagrangian(q2, qdot_discrete))
+            qdot_discrete = NaturalVelocities((q2 - q1) / self.time_step)
+            return MX(self.time_step) / 2 * (self.biomodel.lagrangian(q1, qdot_discrete) + self.biomodel.lagrangian(q2, qdot_discrete))
         else:
             raise NotImplementedError(
                 f"Discrete Lagrangian {self.discrete_lagrangian_approximation} is not implemented"
@@ -459,12 +440,12 @@ class VariationalIntegrator:
         u_cur = self.controls[:, 1]
 
         # initialize the outputs of the integrator
-        q_all = np.zeros((self.biorbd_model.nbQ(), self.nb_steps))
-        q_all[:, 0] = q_prev
-        q_all[:, 1] = q_cur
+        q_all = np.zeros((self.biomodel.nb_Q, self.nb_steps))
+        q_all[:, 0:1] = q_prev
+        q_all[:, 1:2] = q_cur
 
         if self.constraints is not None:
-            lambdas_all = np.zeros((self.constraints.nnz_out(), self.nb_steps))
+            lambdas_all = np.zeros((self.biomodel.nb_holonomic_constraints, self.nb_steps))
             lambdas_num = lambdas_all[:, 0]
         else:
             lambdas_num = np.zeros((0, self.nb_steps))
@@ -502,7 +483,7 @@ class VariationalIntegrator:
         """
         v = q
         if self.constraints is not None:
-            v = np.concatenate((v, lambdas), axis=0)
+            v = np.concatenate((v[:,0], lambdas), axis=0)
         return v
 
     def _dispatch_to_q_lambdas(self, v: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -514,9 +495,9 @@ class VariationalIntegrator:
         v: np.ndarray
             The generalized coordinates and Lagrange multipliers
         """
-        q = v[: self.biorbd_model.nbQ()]
+        q = v[: self.biomodel.nb_Q]
         if self.constraints is not None:
-            lambdas = v[self.biorbd_model.nbQ() :]
+            lambdas = v[self.biomodel.nb_Q :]
         else:
             lambdas = None
         return q, lambdas
