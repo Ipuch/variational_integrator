@@ -43,25 +43,6 @@ class Models(Enum):
 #     return np.concatenate((qdot, biorbd_model.ForwardDynamics(q, qdot, tau).to_array()))
 #
 #
-# def total_energy_i(biorbd_model: biorbd.Model, q: np.ndarray, qdot: np.ndarray) -> np.ndarray:
-#     """
-#     Compute the total energy of a biorbd model
-#
-#     Parameters
-#     ----------
-#     biorbd_model: biorbd.Model
-#         The biorbd model
-#     q: np.ndarray
-#         The generalized coordinates
-#     qdot: np.ndarray
-#         The generalized velocities
-#
-#     Returns
-#     -------
-#     The total energy
-#     """
-#
-#     return biorbd_model.KineticEnergy(q, qdot) + biorbd_model.PotentialEnergy(q)
 #
 #
 # def total_energy(biorbd_model: biorbd.Model, q: np.ndarray, qdot: np.ndarray) -> np.ndarray:
@@ -112,28 +93,28 @@ class Models(Enum):
 #     return total_energy_i(biorbd_model, np.array(q_middle), np.array(qdot_middle))
 #
 #
-# def discrete_total_energy(biorbd_model: biorbd.Model, q: np.ndarray, time_step) -> np.ndarray:
-#     """
-#     Compute the discrete total energy of a biorbd model
-#
-#     Parameters
-#     ----------
-#     biorbd_model: biorbd.Model
-#         The biorbd model
-#     q: np.ndarray
-#         The generalized coordinates
-#     time_step: float
-#         The time step
-#
-#     Returns
-#     -------
-#     The discrete total energy
-#     """
-#     n_frames = q.shape[1]
-#     discrete_total_energy = np.zeros((n_frames - 1, 1))
-#     for i in range(n_frames - 1):
-#         discrete_total_energy[i] = discrete_total_energy_i(biorbd_model, q[:, i], q[:, i + 1], time_step)
-#     return discrete_total_energy
+def discrete_total_energy(biomodel: bionc.BiomechanicalModel, q: np.ndarray, time_step) -> np.ndarray:
+    """
+    Compute the discrete total energy of a biorbd model
+
+    Parameters
+    ----------
+    biorbd_model: biorbd.Model
+        The biorbd model
+    q: np.ndarray
+        The generalized coordinates
+    time_step: float
+        The time step
+
+    Returns
+    -------
+    The discrete total energy
+    """
+    n_frames = q.shape[1]
+    discrete_total_energy = np.zeros((n_frames - 1, 1))
+    for i in range(n_frames - 1):
+        discrete_total_energy[i] = discrete_total_energy_i(biorbd_model, q[:, i], q[:, i + 1], time_step)
+    return discrete_total_energy
 
 
 def one_pendulum():

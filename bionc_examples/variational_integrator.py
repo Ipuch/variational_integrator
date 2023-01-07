@@ -179,6 +179,27 @@ class VariationalIntegrator:
 
         return ifcn
 
+    def discrete_q(self, q1, q2):
+        """
+        This function returns the discrete q values
+        """
+        if self.discrete_lagrangian_approximation == QuadratureRule.MIDPOINT:
+            return (q1 + q2) / 2
+        elif self.discrete_lagrangian_approximation == QuadratureRule.LEFT_APPROXIMATION:
+            return q1
+        elif self.discrete_lagrangian_approximation == QuadratureRule.RIGHT_APPROXIMATION:
+            return q2
+        elif self.discrete_lagrangian_approximation == QuadratureRule.TRAPEZOIDAL:
+            # from : M. West, “Variational integrators,” Ph.D. dissertation, California Inst.
+            # Technol., Pasadena, CA, 2004. p 13
+            qdot_discrete = NaturalVelocities((q2 - q1) / self.time_step)
+            return MX(self.time_step) / 2 * (
+                        self.biomodel.lagrangian(q1, qdot_discrete) + self.biomodel.lagrangian(q2, qdot_discrete))
+        else:
+            raise NotImplementedError(
+                f"Discrete Lagrangian {self.discrete_lagrangian_approximation} is not implemented"
+            )
+
     def discrete_lagrangian(self, q1: MX | SX, q2: MX | SX) -> MX | SX:
         """
         Compute the discrete Lagrangian of a biorbd model
@@ -483,7 +504,7 @@ class VariationalIntegrator:
         """
         v = q
         if self.constraints is not None:
-            v = np.concatenate((v[:,0], lambdas), axis=0)
+            v = np.concatenate((v[:, 0], lambdas), axis=0)
         return v
 
     def _dispatch_to_q_lambdas(self, v: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
