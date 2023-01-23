@@ -4,11 +4,11 @@ and a first order quadrature method.
 """
 from enum import Enum
 import numpy as np
-from casadi import MX, SX, jacobian, Function, rootfinder, transpose, vertcat
+from casadi import MX, jacobian, Function
 import biorbd_casadi
 import biorbd
 
-from variational_integrator import VariationalIntegrator, QuadratureRule
+from varint.minimal_variational_integrator import VariationalIntegrator, QuadratureRule
 
 
 class Models(Enum):

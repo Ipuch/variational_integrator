@@ -5,9 +5,9 @@ and a first order quadrature method.
 import numpy as np
 
 import bionc
-from bionc.bionc_numpy import SegmentNaturalCoordinates, NaturalCoordinates, SegmentNaturalVelocities, NaturalVelocities
+from bionc.bionc_numpy import SegmentNaturalCoordinates, NaturalCoordinates
 
-from variational_integrator import VariationalIntegrator, QuadratureRule
+from varint.natural_variational_integrator import VariationalIntegrator, QuadratureRule
 from models.enums import Models
 
 

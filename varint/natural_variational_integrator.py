@@ -2,34 +2,12 @@
 This script is used to integrate the motion with a variational integrator based on the discrete Lagrangian,
 and a first order quadrature method.
 """
-from typing import Tuple
-from enum import Enum
+from typing import Tuple, Callable
 import numpy as np
 from casadi import MX, SX, jacobian, Function, rootfinder, transpose, vertcat
 import bionc.bionc_casadi as bionc
 from bionc.bionc_casadi import NaturalCoordinates, NaturalVelocities
-
-
-class QuadratureRule(Enum):
-    """
-    The different discrete methods
-    """
-
-    MIDPOINT = "midpoint"
-    LEFT_APPROXIMATION = "left_approximation"
-    RIGHT_APPROXIMATION = "right_approximation"
-    TRAPEZOIDAL = "trapezoidal"
-
-
-class VariationalIntegratorType(Enum):
-    """
-    The different variational integrator types
-    """
-
-    DISCRETE_EULER_LAGRANGE = "discrete_euler_lagrange"
-    CONSTRAINED_DISCRETE_EULER_LAGRANGE = "constrained_discrete_euler_lagrange"
-    FORCED_DISCRETE_EULER_LAGRANGE = "forced_discrete_euler_lagrange"
-    FORCED_CONSTRAINED_DISCRETE_EULER_LAGRANGE = "forced_constrained_discrete_euler_lagrange"
+from .enums import VariationalIntegratorType, QuadratureRule
 
 
 class VariationalIntegrator:
@@ -79,7 +57,7 @@ class VariationalIntegrator:
         self.biomodel = biomodel
         self.time_step = time_step
         self.time = time
-        self.nb_steps = int(time / time_step)
+        self.nb_steps = int(time / time_step) + 1
 
         self.constraints = biomodel.holonomic_constraints
         self.jac = biomodel.holonomic_constraints_jacobian
@@ -179,22 +157,37 @@ class VariationalIntegrator:
 
         return ifcn
 
-    def discrete_q(self, q1, q2):
+    def discrete_function(self, function: Callable, q1: MX | SX, q2: MX | SX) -> MX | SX:
         """
-        This function returns the discrete q values
+        This function returns the discrete expression of a function f(qi,qi+1)
+
+        Parameters
+        ----------
+        function: Callable
+            The function to be approximated, (f(qi,qi+1))
+        q1: MX | SX
+            The first value of the discrete variable
+        q2: MX | SX
+            The second value of the discrete variable
         """
+
         if self.discrete_lagrangian_approximation == QuadratureRule.MIDPOINT:
-            return (q1 + q2) / 2
+            q_discrete = (q1 + q2) / 2
+            qdot_discrete = NaturalVelocities((q2 - q1) / self.time_step)
+            return MX(self.time_step) * function(q_discrete, qdot_discrete)
         elif self.discrete_lagrangian_approximation == QuadratureRule.LEFT_APPROXIMATION:
-            return q1
+            q_discrete = q1
+            qdot_discrete = NaturalVelocities((q2 - q1) / self.time_step)
+            return MX(self.time_step) * function(q_discrete, qdot_discrete)
         elif self.discrete_lagrangian_approximation == QuadratureRule.RIGHT_APPROXIMATION:
-            return q2
+            q_discrete = q2
+            qdot_discrete = NaturalVelocities((q2 - q1) / self.time_step)
+            return MX(self.time_step) * function(q_discrete, qdot_discrete)
         elif self.discrete_lagrangian_approximation == QuadratureRule.TRAPEZOIDAL:
             # from : M. West, “Variational integrators,” Ph.D. dissertation, California Inst.
             # Technol., Pasadena, CA, 2004. p 13
             qdot_discrete = NaturalVelocities((q2 - q1) / self.time_step)
-            return MX(self.time_step) / 2 * (
-                        self.biomodel.lagrangian(q1, qdot_discrete) + self.biomodel.lagrangian(q2, qdot_discrete))
+            return MX(self.time_step) / 2 * (function(q1, qdot_discrete) + function(q2, qdot_discrete))
         else:
             raise NotImplementedError(
                 f"Discrete Lagrangian {self.discrete_lagrangian_approximation} is not implemented"
@@ -472,7 +465,7 @@ class VariationalIntegrator:
             lambdas_num = np.zeros((0, self.nb_steps))
 
         for i in range(2, self.nb_steps):
-
+            print(i)
             # f(q_prev, q_cur, q_next) = 0, only q_next is unknown
             ifcn = self._declare_residuals(q_prev, q_cur, control_minus=u_prev, control_plus=u_cur)
 

@@ -1,10 +1,13 @@
 from bionc import BiomechanicalModel, SegmentNaturalCoordinates, NaturalCoordinates, NaturalVelocities, \
     SegmentNaturalVelocities
+from casadi import Function
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.integrate import solve_ivp
 import time as t
 from .utils import RK4
+from varint import NaturalVariationalIntegrator as VariationalIntegrator
+from varint import QuadratureRule
 
 
 class StandardSim:
@@ -231,6 +234,177 @@ class StandardSim:
             # self.results["Phi_j_dot"][:, i] = self.biomodel.joints_constraints_derivative(
             #     NaturalCoordinates(self.results["q"][:, i]), NaturalVelocities(self.results["qdot"][:, i])
             # )
+
+    def plot_Q(self):
+        q = NaturalCoordinates(self.results["q"])
+        fig, axs = plt.subplots(4, self.biomodel.nb_segments)
+        for i in range(self.biomodel.nb_segments):
+            for iu in range(3):
+                axs[0, i].plot(
+                    self.results["time_steps"], q.vector(i).u[iu, :], label="Variational Integrator", linestyle="-"
+                )
+
+            for irp in range(3):
+                axs[1, i].plot(
+                    self.results["time_steps"], q.vector(i).rp[irp, :], label="Variational Integrator", linestyle="-"
+                )
+
+            for ird in range(3):
+                axs[2, i].plot(
+                    self.results["time_steps"], q.vector(i).rd[ird, :], label="Variational Integrator", linestyle="-"
+                )
+
+            for iw in range(3):
+                axs[3, i].plot(
+                    self.results["time_steps"], q.vector(i).w[iw, :], label="Variational Integrator", linestyle="-"
+                )
+
+        axs[0, 0].set_ylabel("u")
+        axs[1, 0].set_ylabel("rp")
+        axs[2, 0].set_ylabel("rd")
+        axs[3, 0].set_ylabel("w")
+
+        # for i in range(biomodel.nb_rigid_body_constraints):
+        #     axs[0, 1].plot(
+        #         time_step, lambdas_vi[i, :], label="Variational Integrator", color="red", linestyle="-"
+        #     )
+        # for i in range(biomodel.nb_rigid_body_constraints,
+        #                biomodel.nb_rigid_body_constraints + biomodel.nb_joint_constraints):
+        #     axs[1, 1].plot(
+        #         time_step, lambdas_vi[i, :], label="Variational Integrator", color="green",
+        #         linestyle="-"
+        #     )
+
+        # axs[0, 0].legend()
+
+
+class VariationalSim:
+    def __init__(self,
+                 biomodel,
+                 final_time,
+                 dt,
+                 all_q_t0=None,
+                 all_q_t1=None,
+                 ):
+        self.biomodel = biomodel
+        self.final_time = final_time
+        self.dt = dt
+
+        if all_q_t0 is None:
+            tuple_of_Q = [
+                SegmentNaturalCoordinates.from_components(u=[1, 0, 0], rp=[0, -i, 0], rd=[0, -i - 1, 0], w=[0, 0, 1])
+                for i in range(0, self.biomodel.nb_segments)
+            ]
+            Q = NaturalCoordinates.from_qi(tuple(tuple_of_Q))
+            self.all_q_t0 = Q
+        else:
+            self.all_q_t0 = all_q_t0
+
+        if all_q_t1 is None:
+            tuple_of_Q = [
+                SegmentNaturalCoordinates.from_components(u=[1, 0, 0], rp=[0, -i, 0], rd=[0, -i - 1, 0], w=[0, 0, 1])
+                for i in range(0, self.biomodel.nb_segments)
+            ]
+            Q = NaturalCoordinates.from_qi(tuple(tuple_of_Q))
+            self.all_q_t1 = Q
+        else:
+            self.all_q_t1 = all_q_t1
+
+        results_col = ['time', 'time_steps',
+                       'states', 'q', 'qdot', "lagrange_multipliers",
+                       'Etot', 'Ekin', 'Epot',
+                       'Phi_r', 'Phi_j',
+                       'Phi_rdot', 'Phi_jdot',
+                       'Phi_rddot', 'Phi_jddot', ]
+        self.results = {d: None for d in results_col}
+        self.results["time_steps"] = np.arange(0, self.final_time, self.dt)
+
+        vi = VariationalIntegrator(
+            biomodel=self.biomodel,
+            time_step=self.dt,
+            time=self.final_time,
+            discrete_lagrangian_approximation=QuadratureRule.TRAPEZOIDAL,
+            q_init=np.concatenate((self.all_q_t0[:, np.newaxis], self.all_q_t1[:, np.newaxis]), axis=1),
+        )
+        tic0 = t.time()
+        self.results["q"], self.results["lagrange_multipliers"] = vi.integrate()
+        tic_end = t.time()
+        print("Variational Integrator took {} seconds".format(tic_end - tic0))
+        self.results["time"] = tic_end - tic0
+
+        self.discrete_energy_function = Function("energy",
+                                                 [vi.q_cur, vi.q_next],
+                                                 [vi.discrete_function(
+                                                     function=self.biomodel.energy, q1=vi.q_cur, q2=vi.q_next),
+                                                 ]).expand()
+
+        self.discrete_kinetic_energy_function = Function("kinetic_energy",
+                                                            [vi.q_cur, vi.q_next],
+                                                            [vi.discrete_function(
+                                                                function=lambda q, qdot: self.biomodel.kinetic_energy(qdot), q1=vi.q_cur, q2=vi.q_next),
+                                                            ]).expand()
+
+        self.discrete_potential_energy_function = Function("potential_energy",
+                    [vi.q_cur, vi.q_next],
+                    [vi.discrete_function(
+                        function=lambda q, qdot: self.biomodel.potential_energy(q), q1=vi.q_cur, q2=vi.q_next),
+                    ]).expand()
+
+        self.discrete_rigid_body_constraint_function = Function("Phi_r",
+                    [vi.q_cur, vi.q_next],
+                    [vi.discrete_function(
+                        function=lambda q, qdot: self.biomodel.rigid_body_constraints(q), q1=vi.q_cur, q2=vi.q_next),
+                    ]).expand()
+        self.discrete_joint_constraint_function = Function("Phi_j",
+                    [vi.q_cur, vi.q_next],
+                    [vi.discrete_function(
+                        function=lambda q, qdot: self.biomodel.joint_constraints(q), q1=vi.q_cur, q2=vi.q_next),
+                    ]).expand()
+
+
+
+        self.compute_energy()
+        self.compute_constraints()
+        # self.compute_constraint_derivative()
+
+    def compute_energy(self):
+        """
+        Compute the energy of the system at each time step
+        """
+        self.results["Etot"] = np.zeros(len(self.results["time_steps"]))
+        self.results["Ekin"] = np.zeros(len(self.results["time_steps"]))
+        self.results["Epot"] = np.zeros(len(self.results["time_steps"]))
+
+        for i in range(len(self.results["time_steps"])):
+            self.results["Etot"][i] = self.discrete_energy_function(self.results["q"][:, i], self.results["q"][:, i + 1])
+            self.results["Ekin"][i] = self.discrete_kinetic_energy_function(self.results["q"][:, i], self.results["q"][:, i + 1])
+            self.results["Epot"][i] = self.discrete_potential_energy_function(self.results["q"][:, i], self.results["q"][:, i + 1])
+
+    def plot_energy(self):
+        """
+        Plot the energy of the system at each time step
+        """
+        plt.figure()
+        plt.plot(self.results["time_steps"], self.results["Etot"], label="Etot")
+        plt.plot(self.results["time_steps"], self.results["Ekin"], label="Ekin")
+        plt.plot(self.results["time_steps"], self.results["Epot"], label="Epot")
+        plt.legend()
+        plt.xlabel("Time [s]")
+        plt.ylabel("Energy [J]")
+        plt.title("Energy of the system")
+        plt.show()
+
+    def compute_constraints(self):
+        """
+        Compute the constraints of the system at each time step
+        """
+        self.results["Phi_r"] = np.zeros((self.biomodel.nb_rigid_body_constraints, len(self.results["time_steps"])))
+        self.results["Phi_j"] = np.zeros((self.biomodel.nb_joint_constraints, len(self.results["time_steps"])))
+        for i in range(len(self.results["time_steps"])):
+            self.results["Phi_r"][:, i] = self.discrete_rigid_body_constraint_function(
+                NaturalCoordinates(self.results["q"][:, i]), NaturalCoordinates(self.results["q"][:, i + 1])).toarray().squeeze()
+            self.results["Phi_j"][:, i] = self.discrete_joint_constraint_function(
+                NaturalCoordinates(self.results["q"][:, i]), NaturalCoordinates(self.results["q"][:, i + 1])).toarray().squeeze()
 
     def plot_Q(self):
         q = NaturalCoordinates(self.results["q"])

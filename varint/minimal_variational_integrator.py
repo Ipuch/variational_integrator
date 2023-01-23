@@ -3,32 +3,10 @@ This script is used to integrate the motion with a variational integrator based 
 and a first order quadrature method.
 """
 from typing import Tuple
-from enum import Enum
 import numpy as np
 from casadi import MX, SX, jacobian, Function, rootfinder, transpose, vertcat
 import biorbd_casadi
-
-
-class QuadratureRule(Enum):
-    """
-    The different discrete methods
-    """
-
-    MIDPOINT = "midpoint"
-    LEFT_APPROXIMATION = "left_approximation"
-    RIGHT_APPROXIMATION = "right_approximation"
-    TRAPEZOIDAL = "trapezoidal"
-
-
-class VariationalIntegratorType(Enum):
-    """
-    The different variational integrator types
-    """
-
-    DISCRETE_EULER_LAGRANGE = "discrete_euler_lagrange"
-    CONSTRAINED_DISCRETE_EULER_LAGRANGE = "constrained_discrete_euler_lagrange"
-    FORCED_DISCRETE_EULER_LAGRANGE = "forced_discrete_euler_lagrange"
-    FORCED_CONSTRAINED_DISCRETE_EULER_LAGRANGE = "forced_constrained_discrete_euler_lagrange"
+from .enums import QuadratureRule, VariationalIntegratorType
 
 
 class VariationalIntegrator:

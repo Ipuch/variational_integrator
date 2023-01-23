@@ -9,8 +9,7 @@ import pandas as pd
 import time as t
 
 # from ..models.enums import Models
-from twenty_pendulum.sim import StandardSim
-from variational_integrator import VariationalIntegrator, QuadratureRule
+from twenty_pendulum.sim import StandardSim, VariationalSim
 
 
 # def forward_dynamics(biorbd_model: biorbd.Model, q: np.ndarray, qdot: np.ndarray, tau: np.ndarray) -> np.ndarray:
@@ -117,8 +116,8 @@ def twenty_pendulum():
     nb_segments = biomodel.nb_segments
     print(f"Number of segments: {nb_segments}")
 
-    time = 1
-    dt = 0.05
+    time = 1.2
+    dt = 0.04
 
     results = pd.DataFrame(
         columns=
@@ -130,36 +129,56 @@ def twenty_pendulum():
          'Phi_rddot', 'Phi_jddot',])
 
     sim_rk4 = StandardSim(biomodel, final_time=time, dt=dt, RK="RK4")
-    sim_rk45 = StandardSim(biomodel, final_time=time, dt=dt, RK="RK45")
+    # sim_rk45 = StandardSim(biomodel, final_time=time, dt=dt, RK="RK45")
 
     # sim_rk4.plot_Q()
     # sim_rk45.plot_Q()
     # plt.show()
 
-    sim_rk4.plot_energy()
-    sim_rk45.plot_energy()
+    # sim_rk4.plot_energy()
+    # sim_rk45.plot_energy()
+    # plt.show()
+
+    print(f"Energy at t=0: {sim_rk4.results['Etot'][0]}")
+    print(f"Energy at t=1: {sim_rk4.results['Etot'][-1]}")
+
+    # print(f"Rigidbody Constraint at t=0: {sim_rk4.results['Phi_r'][:, 0]}")
+    print(f"Rigidbody Constraint at t=end, min: {sim_rk4.results['Phi_r'][:, -1].min()}")
+    print(f"Rigidbody Constraint at t=end, max: {sim_rk4.results['Phi_r'][:, -1].max()}")
+    # print(f"Rigidbody Constraint at t=end, median: {sim_rk4.results['Phi_r'][:, -1].median()}")
+
+    # print(f"Joint Constraint at t=0: {sim_rk4.results['Phi_j'][:, 0]}")
+    print(f"Joint Constraint at t=end, min: {sim_rk4.results['Phi_j'][:, -1].min()}")
+    print(f"Joint Constraint at t=end, max: {sim_rk4.results['Phi_j'][:, -1].max()}")
+    # print(f"Joint Constraint at t=end, median: {sim_rk4.results['Phi_j'][:, -1].median()}")
 
     all_q_t0 = sim_rk4.results["q"][:biomodel.nb_Q, 0:1]
     # get the q at the second frame for the discrete euler lagrange equation
     all_q_t1 = sim_rk4.results["q"][:biomodel.nb_Q, 1:2]
 
-    results_VI = dict()
-    # variational integrator
-    vi = VariationalIntegrator(
-        biomodel=casadi_biomodel,
-        time_step=dt,
-        time=time,
-        discrete_lagrangian_approximation=QuadratureRule.TRAPEZOIDAL,
-        q_init=np.concatenate((all_q_t0[:, np.newaxis], all_q_t1[:, np.newaxis]), axis=1),
+    vi_sim = VariationalSim(
+        casadi_biomodel,
+        final_time=time,
+        dt=dt,
+        all_q_t0=all_q_t0,
+        all_q_t1=all_q_t1
     )
-    tic0 = t.time()
-    q_vi, lambdas_vi = vi.integrate()
-    tic_end = t.time()
-    results_VI["time"] = tic_end - tic0
-    print(f"VI time: {results_VI['time']}")
+    vi_sim.plot_energy()
+    print(f"Energy at t=0: {vi_sim.results['Etot'][0]}")
+    print(f"Energy at t=end: {vi_sim.results['Etot'][-1]}")
 
-    results_VI["q"] = q_vi
-    results_VI["lagrange_multipliers"] = lambdas_vi
+    # print(f"Rigidbody Constraint at t=0: {vi_sim.results['Phi_r'][:, 0]}")
+    print(f"Rigidbody Constraint at t=end, min: {vi_sim.results['Phi_r'][:, -1].min()}")
+    print(f"Rigidbody Constraint at t=end, max: {vi_sim.results['Phi_r'][:, -1].max()}")
+    # print(f"Rigidbody Constraint at t=end, median: {vi_sim.results['Phi_r'][:, -1].median()}")
+
+
+    # print(f"Joint Constraint at t=0: {vi_sim.results['Phi_j'][:, 0]}")
+    print(f"Joint Constraint at t=end, min: {vi_sim.results['Phi_j'][:, -1].min()}")
+    print(f"Joint Constraint at t=end, max: {vi_sim.results['Phi_j'][:, -1].max()}")
+    # print(f"Joint Constraint at t=end, median: {vi_sim.results['Phi_j'][:, -1].median()}")
+
+    vi_sim.plot_Q()
 
 
 if __name__ == "__main__":
