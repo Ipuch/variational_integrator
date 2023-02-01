@@ -445,6 +445,7 @@ class VariationalIntegrator:
             lambdas_all = np.zeros((self.constraints.nnz_out(), self.nb_steps))
             lambdas_num = lambdas_all[:, 0]
         else:
+            lambdas_all = None
             lambdas_num = np.zeros((0, self.nb_steps))
 
         for i in range(2, self.nb_steps):
