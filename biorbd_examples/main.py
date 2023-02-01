@@ -325,9 +325,9 @@ def two_pendulum():
     tic0 = t.time()
 
     q_t0 = np.array([1.54, 1.54])
-    t_t0 = biorbd_model.globalJCS(q_t0, 1).to_array()[1:3, 3]
+    t_t0 = biorbd_model.globalJCS(np.array([1.54, 0.0]), 1).to_array()[1:3, 3]
     q_t1 = np.array([1.545, 1.545])
-    t_t1 = biorbd_model.globalJCS(q_t1, 1).to_array()[1:3, 3]
+    t_t1 = biorbd_model.globalJCS(np.array([1.545, 0.0]), 1).to_array()[1:3, 3]
 
     all_q_t0 = np.array([q_t0[0], t_t0[0], t_t0[1], q_t0[1]])
     all_q_t1 = np.array([q_t1[0], t_t1[0], t_t1[1], q_t1[1]])
@@ -613,15 +613,15 @@ def three_pendulums():
     # Rotations at t0
     q_t0 = np.array([1.54, 1.54, 1.54])
     # Translations between Seg1 and Seg2 at t0
-    t1_t0 = biorbd_model.globalJCS(q_t0, 1).to_array()[1:3, 3]
+    t1_t0 = biorbd_model.globalJCS(np.array([1.54, 0.0, 0.0]), 1).to_array()[1:3, 3]
     # Translations between Seg2 and Seg3 at t0
-    t2_t0 = 2 * t1_t0 # biorbd_model.globalJCS(q_t0, 2).to_array()[1:3, 3]
+    t2_t0 = biorbd_model.globalJCS(np.array([1.54, 0.0, 0.0]), 2).to_array()[1:3, 3]
     # Rotations at t1
     q_t1 = np.array([1.545, 1.545, 1.545])
     # Translations between Seg1 and Seg2 at t1
-    t1_t1 = biorbd_model.globalJCS(q_t1, 1).to_array()[1:3, 3]
+    t1_t1 = biorbd_model.globalJCS(np.array([1.545, 0.0, 0.0]), 1).to_array()[1:3, 3]
     # Translations between Seg2 and Seg3 at t1
-    t2_t1 = 2 * t1_t1 # biorbd_model.globalJCS(q_t1, 2).to_array()[1:3, 3]
+    t2_t1 = biorbd_model.globalJCS(np.array([1.545, 0.0, 0.0]), 2).to_array()[1:3, 3]
 
     all_q_t0 = np.array([q_t0[0], t1_t0[0], t1_t0[1], q_t0[1], t2_t0[0], t2_t0[1], q_t0[2]])
     all_q_t1 = np.array([q_t1[0], t1_t1[0], t1_t1[1], q_t1[1], t2_t1[0], t2_t1[1], q_t1[2]])
