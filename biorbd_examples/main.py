@@ -717,7 +717,7 @@ def three_pendulums():
 
     import matplotlib.pyplot as plt
 
-    fig, axs = plt.subplots(5, 2)
+    fig, axs = plt.subplots(6, 2)
     axs[0, 0].plot(
         np.arange(0, time, time_step), q_vi[0, :], label="Variational Integrator", color="red", linestyle="-"
     )
@@ -737,15 +737,18 @@ def three_pendulums():
         np.arange(0, time, time_step), q_vi[5, :], label="Variational Integrator", color="red", linestyle="-"
     )
     axs[3, 0].plot(
-        np.arange(0, time, time_step), lambdas_vi[0, :], label="Variational Integrator", color="red", linestyle="-"
+        np.arange(0, time, time_step), q_vi[6, :], label="Variational Integrator", color="red", linestyle="-"
     )
     axs[3, 1].plot(
-        np.arange(0, time, time_step), lambdas_vi[1, :], label="Variational Integrator", color="red", linestyle="-"
+        np.arange(0, time, time_step), lambdas_vi[0, :], label="Variational Integrator", color="red", linestyle="-"
     )
     axs[4, 0].plot(
-        np.arange(0, time, time_step), lambdas_vi[2, :], label="Variational Integrator", color="red", linestyle="-"
+        np.arange(0, time, time_step), lambdas_vi[1, :], label="Variational Integrator", color="red", linestyle="-"
     )
     axs[4, 1].plot(
+        np.arange(0, time, time_step), lambdas_vi[2, :], label="Variational Integrator", color="red", linestyle="-"
+    )
+    axs[5, 0].plot(
         np.arange(0, time, time_step), lambdas_vi[3, :], label="Variational Integrator", color="red", linestyle="-"
     )
 
@@ -755,10 +758,11 @@ def three_pendulums():
     axs[1, 1].set_title("q3")
     axs[2, 0].set_title("q4")
     axs[2, 1].set_title("q5")
-    axs[3, 0].set_title("lambda0")
-    axs[3, 1].set_title("lambda1")
-    axs[4, 0].set_title("lambda2")
-    axs[4, 1].set_title("lambda3")
+    axs[3, 0].set_title("q6")
+    axs[3, 1].set_title("lambda0")
+    axs[4, 0].set_title("lambda1")
+    axs[4, 1].set_title("lambda2")
+    axs[5, 0].set_title("lambda3")
 
     # Plot total energy for both methods
     q_coord_rel = [q_vi[0, :]]
