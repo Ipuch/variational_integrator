@@ -539,8 +539,11 @@ def one_pendulum():
     axs[1, 1].set_title("lambda2")
 
     # plot total energy for both methods
+    q_energy = np.zeros((1, q_vi.shape[1]))
+    q_energy[0, :] = q_vi[2, :]
+
     plt.figure()
-    plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step), label="Variational Integrator", color="red")
+    plt.plot(discrete_total_energy(biorbd_model, q_energy, time_step), label="Variational Integrator", color="red")
     plt.title("Total energy")
 
     # verify the constraint respect
@@ -635,8 +638,11 @@ def one_pendulum_force():
     axs[1, 1].set_title("lambda2")
 
     # plot total energy for both methods
+    q_energy = np.zeros((1, q_vi.shape[1]))
+    q_energy[0, :] = q_vi[2, :]
+
     plt.figure()
-    plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step), label="Variational Integrator", color="red")
+    plt.plot(discrete_total_energy(biorbd_model, q_energy, time_step), label="Variational Integrator", color="red")
     plt.title("Total energy")
 
     # verify the constraint respect
