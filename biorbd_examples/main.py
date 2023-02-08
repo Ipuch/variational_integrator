@@ -139,6 +139,46 @@ def discrete_total_energy(biorbd_model: biorbd.Model, q: np.ndarray, time_step) 
         discrete_total_energy[i] = discrete_total_energy_i(biorbd_model, q[:, i], q[:, i + 1], time_step)
     return discrete_total_energy
 
+def energy_calcul(biorbd_model, q_vi, n, time_step):
+    """
+    Attention, dans l'état actuel, cette fonction ne peut être utilisée que pour les exemples two_pendulums et three_pendulums
+    :param n: number of pendulums
+    """
+    g = 9.81
+
+    q_coord_rel = [q_vi[0, :]]
+
+    for i in range(1, n):
+        q_coord_rel.append(q_vi[3 * i, :] - q_vi[3 * (i - 1), :])
+
+    q_coord_rel = np.asarray(q_coord_rel)
+
+    Ec = []
+    Ep = []
+
+    for Seg in range(n):
+        CoM_marker = Seg * 3 + 2
+        # Rotational kinetic energy
+        I_G = biorbd_model.segments()[0].characteristics().inertia().to_array()
+        q_coord_rel_dot = (q_coord_rel[Seg, 1:] - q_coord_rel[Seg, :-1]) / time_step
+        Ec_rot = 1 / 2 * I_G[0, 0] * q_coord_rel_dot ** 2
+    # Translational kinetic energy
+    y_com = np.asarray(
+        [biorbd_model.markers(q_coord_rel[:, i])[CoM_marker].to_array()[1] for i in range(len(q_coord_rel[0, :]))])
+    z_com = np.asarray(
+        [biorbd_model.markers(q_coord_rel[:, i])[CoM_marker].to_array()[2] for i in range(len(q_coord_rel[0, :]))])
+    vy_com = (y_com[1:] - y_com[:-1]) / time_step
+    vz_com = (z_com[1:] - z_com[:-1]) / time_step
+    V_com0_sq = vy_com ** 2 + vz_com ** 2
+    Ec_trs = 1 / 2 * biorbd_model.segments()[0].characteristics().mass() * V_com0_sq
+
+    Ec.append(Ec_trs + Ec_rot)
+
+    # Potential energy
+    Ep.append(biorbd_model.segments()[Seg].characteristics().mass() * g * z_com)
+
+    return np.sum(np.asarray(Ep)[:, :-1], axis=0) + np.sum(Ec, axis=0)
+
 
 def pendulum():
     biorbd_casadi_model = biorbd_casadi.Model(Models.PENDULUM.value)
@@ -237,6 +277,7 @@ def double_pendulum():
         time_step=time_step,
         time=time,
         q_init=np.concatenate((q_rk45[:2, 0:1], q_rk45[:2, 1:2]), axis=1),
+        discrete_lagrangian_approximation=QuadratureRule.MIDPOINT,
     )
     # vi.set_initial_values(q_prev=1.54, q_cur=1.545)
     q_vi, _ = vi.integrate()
@@ -396,8 +437,18 @@ def two_pendulum():
     axs[0, 0].legend()
 
     # plot total energy for both methods
+    q_coord_rel = [q_vi[0, :]]
+    for i in range(1, 2):
+        q_coord_rel.append(q_vi[3 * i, :] - q_vi[3 * (i - 1), :])
+    q_coord_rel = np.asarray(q_coord_rel)
+
     plt.figure()
-    plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step), label="Variational Integrator", color="red")
+    plt.plot(discrete_total_energy(biorbd_model, q_coord_rel, time_step), label="RBDL")
+    plt.plot(energy_calcul(biorbd_model, q_vi, 2, time_step), label="Amandine")
+    plt.legend()
+
+    plt.figure()
+    plt.plot(discrete_total_energy(biorbd_model, q_coord_rel, time_step), label="Variational Integrator", color="red")
     plt.title("Total energy")
     plt.legend()
 
@@ -634,7 +685,7 @@ def three_pendulums():
     )
     # The origin of the third pendulum is constrained to the tip of the second pendulum
     constraint2 = (
-            biorbd_casadi_model.markers(q_sym)[3].to_mx()[1:] - biorbd_casadi_model.globalJCS(q_sym, 2).to_mx()[1:3, 3]
+            biorbd_casadi_model.markers(q_sym)[4].to_mx()[1:] - biorbd_casadi_model.globalJCS(q_sym, 2).to_mx()[1:3, 3]
     )
     constraint = vertcat(constraint1, constraint2)
     fcn_constraint = Function("constraint", [q_sym], [constraint], ["q"], ["constraint"]).expand()
@@ -710,8 +761,18 @@ def three_pendulums():
     axs[4, 1].set_title("lambda3")
 
     # Plot total energy for both methods
+    q_coord_rel = [q_vi[0, :]]
+    for i in range(1, 2):
+        q_coord_rel.append(q_vi[3 * i, :] - q_vi[3 * (i - 1), :])
+    q_coord_rel = np.asarray(q_coord_rel)
+
     plt.figure()
-    plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step), color="red")
+    plt.plot(discrete_total_energy(biorbd_model, q_coord_rel, time_step), label="RBDL")
+    plt.plot(energy_calcul(biorbd_model, q_vi, 3, time_step), label="Amandine")
+    plt.legend()
+
+    plt.figure()
+    plt.plot(discrete_total_energy(biorbd_model, q_coord_rel, time_step), color="red")
     plt.title("Total energy with variational integrator")
 
     # Verify the constraint respect

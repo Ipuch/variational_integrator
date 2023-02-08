@@ -1,6 +1,6 @@
 version 4
 
-segment Seg1
+segment Seg0
     rotations	x
     ranges
         -10*pi 10*pi
@@ -13,16 +13,56 @@ segment Seg1
     meshfile mesh/pendulum.STL
 endsegment
 
+    // Marker 0
+    marker marker_0
+        parent Seg0
+        position 0 0 0
+    endmarker
+
     // Marker 1
     marker marker_1
+        parent Seg0
+        position 0 0 -1
+    endmarker
+
+    // Marker 2
+    marker CoM0
+        parent Seg0
+        position -0.0005 0.0688 -0.9542
+    endmarker
+
+segment Seg1
+    translations    yz
+    rotations	x
+    ranges
+        -5 5
+        -5 5
+        -pi/2 pi/2
+    mass 1
+    inertia
+        0.0391  0.0000	0.0000
+	    0.0000	0.0335	-0.0032
+	    0.0000	-0.0032	0.0090
+    com  -0.0005 0.0688 -0.9542
+    meshfile mesh/pendulum.STL
+endsegment
+
+    // Marker 3
+    marker marker_3
         parent Seg1
         position 0 0 0
     endmarker
 
-    // Marker 2
-    marker marker_2
+    // Marker 4
+    marker marker_4
         parent Seg1
         position 0 0 -1
+    endmarker
+
+    // Marker 5
+    marker CoM1
+        parent Seg1
+        position -0.0005 0.0688 -0.9542
     endmarker
 
 segment Seg2
@@ -41,42 +81,20 @@ segment Seg2
     meshfile mesh/pendulum.STL
 endsegment
 
-    // Marker 3
-    marker marker_3
-        parent Seg2
-        position 0 0 0
-    endmarker
-
-    // Marker 4
-    marker marker_4
-        parent Seg2
-        position 0 0 -1
-    endmarker
-
-segment Seg3
-    translations    yz
-    rotations	x
-    ranges
-        -5 5
-        -5 5
-        -pi/2 pi/2
-    mass 1
-    inertia
-        0.0391  0.0000	0.0000
-	    0.0000	0.0335	-0.0032
-	    0.0000	-0.0032	0.0090
-    com  -0.0005 0.0688 -0.9542
-    meshfile mesh/pendulum.STL
-endsegment
-
-    // Marker 5
-    marker marker_5
-        parent Seg3
-        position 0 0 0
-    endmarker
-
     // Marker 6
     marker marker_6
-        parent Seg3
+        parent Seg2
+        position 0 0 0
+    endmarker
+
+    // Marker 7
+    marker marker_7
+        parent Seg2
         position 0 0 -1
+    endmarker
+
+    // Marker 8
+    marker CoM2
+        parent Seg2
+        position -0.0005 0.0688 -0.9542
     endmarker
