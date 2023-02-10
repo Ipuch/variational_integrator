@@ -123,7 +123,9 @@ def one_pendulum():
     Q = NaturalCoordinates(Qi)
     all_q_t0 = Q
 
-    Qi = SegmentNaturalCoordinates.from_components(u=[1, 0, 0], rp=[0, 0, 0], rd=[0, -0.99, 0.14106735979665883], w=[0, 0, 1])
+    Qi = SegmentNaturalCoordinates.from_components(
+        u=[1, 0, 0], rp=[0, 0, 0], rd=[0, -0.99, 0.14106735979665883], w=[0, 0, 1]
+    )
     Q = NaturalCoordinates(Qi)
     all_q_t1 = Q
 
@@ -185,9 +187,15 @@ def one_pendulum():
         axs[0, 1].plot(
             np.arange(0, time, time_step), lambdas_vi[i, :], label="Variational Integrator", color="red", linestyle="-"
         )
-    for i in range(biomodel.nb_rigid_body_constraints, biomodel.nb_rigid_body_constraints + biomodel.nb_joint_constraints):
+    for i in range(
+        biomodel.nb_rigid_body_constraints, biomodel.nb_rigid_body_constraints + biomodel.nb_joint_constraints
+    ):
         axs[1, 1].plot(
-            np.arange(0, time, time_step), lambdas_vi[i, :], label="Variational Integrator", color="green", linestyle="-"
+            np.arange(0, time, time_step),
+            lambdas_vi[i, :],
+            label="Variational Integrator",
+            color="green",
+            linestyle="-",
         )
 
     axs[0, 0].set_title("u")

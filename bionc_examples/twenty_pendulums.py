@@ -120,13 +120,24 @@ def twenty_pendulum():
     dt = 0.04
 
     results = pd.DataFrame(
-        columns=
-        ['time', 'time_steps',
-         'states','q', 'qdot', "lagrange_multipliers",
-         'Etot', 'Ekin', 'Epot',
-         'Phi_r', 'Phi_j',
-         'Phi_rdot', 'Phi_jdot',
-         'Phi_rddot', 'Phi_jddot',])
+        columns=[
+            "time",
+            "time_steps",
+            "states",
+            "q",
+            "qdot",
+            "lagrange_multipliers",
+            "Etot",
+            "Ekin",
+            "Epot",
+            "Phi_r",
+            "Phi_j",
+            "Phi_rdot",
+            "Phi_jdot",
+            "Phi_rddot",
+            "Phi_jddot",
+        ]
+    )
 
     sim_rk4 = StandardSim(biomodel, final_time=time, dt=dt, RK="RK4")
     # sim_rk45 = StandardSim(biomodel, final_time=time, dt=dt, RK="RK45")
@@ -152,17 +163,11 @@ def twenty_pendulum():
     print(f"Joint Constraint at t=end, max: {sim_rk4.results['Phi_j'][:, -1].max()}")
     # print(f"Joint Constraint at t=end, median: {sim_rk4.results['Phi_j'][:, -1].median()}")
 
-    all_q_t0 = sim_rk4.results["q"][:biomodel.nb_Q, 0:1]
+    all_q_t0 = sim_rk4.results["q"][: biomodel.nb_Q, 0:1]
     # get the q at the second frame for the discrete euler lagrange equation
-    all_q_t1 = sim_rk4.results["q"][:biomodel.nb_Q, 1:2]
+    all_q_t1 = sim_rk4.results["q"][: biomodel.nb_Q, 1:2]
 
-    vi_sim = VariationalSim(
-        casadi_biomodel,
-        final_time=time,
-        dt=dt,
-        all_q_t0=all_q_t0,
-        all_q_t1=all_q_t1
-    )
+    vi_sim = VariationalSim(casadi_biomodel, final_time=time, dt=dt, all_q_t0=all_q_t0, all_q_t1=all_q_t1)
     vi_sim.plot_energy()
     print(f"Energy at t=0: {vi_sim.results['Etot'][0]}")
     print(f"Energy at t=end: {vi_sim.results['Etot'][-1]}")
@@ -171,7 +176,6 @@ def twenty_pendulum():
     print(f"Rigidbody Constraint at t=end, min: {vi_sim.results['Phi_r'][:, -1].min()}")
     print(f"Rigidbody Constraint at t=end, max: {vi_sim.results['Phi_r'][:, -1].max()}")
     # print(f"Rigidbody Constraint at t=end, median: {vi_sim.results['Phi_r'][:, -1].median()}")
-
 
     # print(f"Joint Constraint at t=0: {vi_sim.results['Phi_j'][:, 0]}")
     print(f"Joint Constraint at t=end, min: {vi_sim.results['Phi_j'][:, -1].min()}")

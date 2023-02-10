@@ -6,7 +6,7 @@ from typing import Tuple
 import numpy as np
 from casadi import MX, SX, jacobian, Function, rootfinder, transpose, vertcat
 import biorbd_casadi
-from .enums import QuadratureRule, VariationalIntegratorType
+from .enums import QuadratureRule, VariationalIntegratorType, ControlType
 
 
 class VariationalIntegrator:
@@ -39,13 +39,13 @@ class VariationalIntegrator:
         q_init: np.ndarray,
         constraints: Function = None,
         jac: Function = None,
-        discrete_lagrangian_approximation: QuadratureRule = QuadratureRule.TRAPEZOIDAL,
+        discrete_approximation: QuadratureRule = QuadratureRule.TRAPEZOIDAL,
         controls: np.ndarray = None,
-        # control_type: ControlType = ControlType.CONSTANT,
+        control_type: ControlType = ControlType.PIECEWISE_CONSTANT,
         forces: Function = None,
         # force_approximation: QuadratureRule = QuadratureRule.TRAPEZOIDAL,
+        newton_descent_tolerance: float = 1e-14,
     ):
-
         # check q_init
         if q_init.shape[0] != biorbd_model.nbQ():
             raise RuntimeError("q_init must have the same number of rows as the number of degrees of freedom")
@@ -62,15 +62,17 @@ class VariationalIntegrator:
 
         self.constraints = constraints
         self.jac = jac
-        self.discrete_lagrangian_approximation = discrete_lagrangian_approximation
+        self.discrete_approximation = discrete_approximation
+        self.control_type = control_type
 
         if controls is None:
-            controls = np.zeros((self.biorbd_model.nbQ(), self.nb_steps))
+            self.controls = np.zeros((self.biorbd_model.nbQ(), self.nb_steps))
         elif controls.shape[0] != self.biorbd_model.nbQ():
             raise ValueError("The control must be of the same size as the number of degrees of freedom")
         elif controls.shape[1] != self.time / self.time_step:
             raise ValueError("The control must have the same number of time steps as the time of the simulation")
-        self.controls = controls
+        else:
+            self.controls = controls
         # self.control_type = control_type
         # self._controls_to_force_func()
 
@@ -90,6 +92,7 @@ class VariationalIntegrator:
 
         self._declare_mx()
         self._declare_discrete_euler_lagrange_equations()
+        self.newton_descent_tolerance = newton_descent_tolerance
 
     def _declare_mx(self):
         """
@@ -117,13 +120,13 @@ class VariationalIntegrator:
 
         # output of the discrete Euler-Lagrange equations
         output = [
-            self.interface_discrete_euler_lagrange_equations(
+            self._discrete_euler_lagrange_equations(
                 self.q_prev,
                 self.q_cur,
                 self.q_next,
-                self.lambdas,
                 self.control_minus,
                 self.control_plus,
+                self.lambdas,
             )
         ]
 
@@ -141,7 +144,6 @@ class VariationalIntegrator:
             self.variational_integrator_type == VariationalIntegratorType.CONSTRAINED_DISCRETE_EULER_LAGRANGE
             or self.variational_integrator_type == VariationalIntegratorType.FORCED_CONSTRAINED_DISCRETE_EULER_LAGRANGE
         ):
-
             decision_variables = vertcat(decision_variables, self.lambdas)
             mx_residuals = vertcat(mx_residuals, self.constraints(self.q_next))
 
@@ -153,7 +155,7 @@ class VariationalIntegrator:
 
         # Create a implicit function instance to solve the system of equations
         opts = {}
-        opts["abstol"] = 1e-14
+        opts["abstol"] = self.newton_descent_tolerance
         ifcn = rootfinder("ifcn", "newton", self.residuals, opts)
 
         return ifcn
@@ -191,26 +193,26 @@ class VariationalIntegrator:
         -------
         The discrete Lagrangian
         """
-        if self.discrete_lagrangian_approximation == QuadratureRule.MIDPOINT:
+        if self.discrete_approximation == QuadratureRule.MIDPOINT:
             q_discrete = (q1 + q2) / 2
             qdot_discrete = (q2 - q1) / self.time_step
             return MX(self.time_step) * self.lagrangian(q_discrete, qdot_discrete)
-        elif self.discrete_lagrangian_approximation == QuadratureRule.LEFT_APPROXIMATION:
+        elif self.discrete_approximation == QuadratureRule.LEFT_APPROXIMATION:
             q_discrete = q1
             qdot_discrete = (q2 - q1) / self.time_step
             return MX(self.time_step) * self.lagrangian(q_discrete, qdot_discrete)
-        elif self.discrete_lagrangian_approximation == QuadratureRule.RIGHT_APPROXIMATION:
+        elif self.discrete_approximation == QuadratureRule.RIGHT_APPROXIMATION:
             q_discrete = q2
             qdot_discrete = (q2 - q1) / self.time_step
             return MX(self.time_step) * self.lagrangian(q_discrete, qdot_discrete)
-        elif self.discrete_lagrangian_approximation == QuadratureRule.TRAPEZOIDAL:
+        elif self.discrete_approximation == QuadratureRule.TRAPEZOIDAL:
             # from : M. West, “Variational integrators,” Ph.D. dissertation, California Inst.
             # Technol., Pasadena, CA, 2004. p 13
             qdot_discrete = (q2 - q1) / self.time_step
             return MX(self.time_step) / 2 * (self.lagrangian(q1, qdot_discrete) + self.lagrangian(q2, qdot_discrete))
         else:
             raise NotImplementedError(
-                f"Discrete Lagrangian {self.discrete_lagrangian_approximation} is not implemented"
+                f"Discrete Lagrangian {self.discrete_approximation} is not implemented"
             )
 
     # def discrete_force(self, q_prev: MX | SX, q_cur: MX | SX) -> MX | SX:
@@ -248,7 +250,7 @@ class VariationalIntegrator:
     #         return MX(self.time_step) / 4 * (self.force(q_prev, qdot_discrete) + self.force(q_cur, qdot_discrete))
     #     else:
     #         raise NotImplementedError(
-    #             f"Discrete Lagrangian {self.discrete_lagrangian_approximation} is not implemented"
+    #             f"Discrete Lagrangian {self.discrete_approximation} is not implemented"
     #         )
 
     def compute_p_current(self, q_prev: MX | SX, q_cur: MX | SX) -> MX | SX:
@@ -268,131 +270,7 @@ class VariationalIntegrator:
         """
         return transpose(jacobian(self.discrete_lagrangian(q_prev, q_cur), q_cur))
 
-    def compute_pi_current(self, q_cur: MX | SX) -> MX | SX:
-        """
-        Compute the current pi, the constraint jacobian
-
-        Parameters
-        ----------
-        q_cur: MX | SX
-            The generalized coordinates at the current time step
-
-        Returns
-        -------
-        The current pi, the constraint jacobian
-        """
-        return self.jac(q_cur)
-
-    def interface_discrete_euler_lagrange_equations(
-        self, q_prev, q_cur, q_next, lambdas, control_minus, control_plus
-    ) -> MX | SX:
-        if self.variational_integrator_type == VariationalIntegratorType.DISCRETE_EULER_LAGRANGE:
-            return self._discrete_euler_lagrange_equations(
-                q_prev=q_prev,
-                q_cur=q_cur,
-                q_next=q_next,
-            )
-        elif self.variational_integrator_type == VariationalIntegratorType.CONSTRAINED_DISCRETE_EULER_LAGRANGE:
-            return self._constrained_discrete_euler_lagrange_equations(
-                q_prev=q_prev,
-                q_cur=q_cur,
-                q_next=q_next,
-                lambdas=lambdas,
-            )
-        elif self.variational_integrator_type == VariationalIntegratorType.FORCED_DISCRETE_EULER_LAGRANGE:
-            return self._forced_discrete_euler_lagrange_equations(
-                q_prev=q_prev,
-                q_cur=q_cur,
-                q_next=q_next,
-                control_minus=control_minus,
-                control_plus=control_plus,
-            )
-        elif self.variational_integrator_type == VariationalIntegratorType.FORCED_CONSTRAINED_DISCRETE_EULER_LAGRANGE:
-            return self._forced_constrained_discrete_euler_lagrange_equations(
-                q_prev=q_prev,
-                q_cur=q_cur,
-                q_next=q_next,
-                lambdas=lambdas,
-                control_minus=control_minus,
-                control_plus=control_plus,
-            )
-        else:
-            raise NotImplementedError(
-                f"Variational integrator type {self.variational_integrator_type} is not implemented"
-            )
-
-    def _discrete_euler_lagrange_equations(self, q_prev: MX | SX, q_cur: MX | SX, q_next: MX | SX) -> MX | SX:
-        """
-        Compute the discrete Euler-Lagrange equations of a biorbd model
-
-        Parameters
-        ----------
-        q_prev: MX | SX
-            The generalized coordinates at the first time step
-        q_cur: MX | SX
-            The generalized coordinates at the second time step
-        q_next: MX | SX
-            The generalized coordinates at the third time step
-
-        Returns
-        -------
-        The discrete Euler-Lagrange equations
-        """
-        p_current = self.compute_p_current(q_prev, q_cur)
-        D1_Ld_q2_q3 = transpose(jacobian(self.discrete_lagrangian(q_cur, q_next), q_cur))
-        return p_current + D1_Ld_q2_q3
-
-    def _constrained_discrete_euler_lagrange_equations(
-        self, q_prev: MX | SX, q_cur: MX | SX, q_next: MX | SX, lambdas: MX | SX = None
-    ) -> MX | SX:
-        """
-        Compute the discrete Euler-Lagrange equations of a biorbd model
-
-        Parameters
-        ----------
-        q_prev: MX | SX
-            The generalized coordinates at the first time step
-        q_cur: MX | SX
-            The generalized coordinates at the second time step
-        q_next: MX | SX
-            The generalized coordinates at the third time step
-        lambdas: MX | SX
-            The Lagrange multipliers of second current time step
-        """
-        p_current = self.compute_p_current(q_prev, q_cur)  # momentum at current time step
-        pi_current = self.jac(q_cur)
-
-        D1_Ld_qcur_qnext = transpose(jacobian(self.discrete_lagrangian(q_cur, q_next), q_cur))
-
-        return p_current + D1_Ld_qcur_qnext - transpose(pi_current) @ lambdas
-
-    def _forced_discrete_euler_lagrange_equations(
-        self, q_prev: MX | SX, q_cur: MX | SX, q_next: MX | SX, control_minus: MX | SX, control_plus: MX | SX
-    ) -> MX | SX:
-        """
-        Compute the discrete Euler-Lagrange equations of a biorbd model
-
-        Parameters
-        ----------
-        q_prev: MX | SX
-            The generalized coordinates at the first time step
-        q_cur: MX | SX
-            The generalized coordinates at the second time step
-        q_next: MX | SX
-            The generalized coordinates at the third time step
-        control_minus: MX | SX
-            The generalized forces at the first time step
-        control_plus: MX | SX
-            The generalized forces at the second time step
-        """
-        p_current = (
-            transpose(jacobian(self.discrete_lagrangian(q_prev, q_cur), q_cur)) + control_plus
-        )  # momentum at current time step + force
-        D1_Ld_qcur_qnext = transpose(jacobian(self.discrete_lagrangian(q_cur, q_next), q_cur))
-
-        return p_current + D1_Ld_qcur_qnext + control_minus
-
-    def _forced_constrained_discrete_euler_lagrange_equations(
+    def _discrete_euler_lagrange_equations(
         self,
         q_prev: MX | SX,
         q_cur: MX | SX,
@@ -419,12 +297,38 @@ class VariationalIntegrator:
         lambdas: MX | SX
             The Lagrange multipliers of second current time step
         """
-        p_current = transpose(jacobian(self.discrete_lagrangian(q_prev, q_cur), q_cur)) + control_plus
-        pi_current = self.jac(q_cur)
+        p_current = self.compute_p_current(q_prev, q_cur)  # momentum at current time step
 
         D1_Ld_qcur_qnext = transpose(jacobian(self.discrete_lagrangian(q_cur, q_next), q_cur))
 
-        return p_current + D1_Ld_qcur_qnext + control_minus - transpose(pi_current) @ lambdas
+        if self.constraints is not None:
+            pi_current = self.jac(q_cur)
+            return p_current + D1_Ld_qcur_qnext - transpose(pi_current) @ lambdas + self.controls_participation(control_minus, control_plus)
+        else:
+            return p_current + D1_Ld_qcur_qnext + self.controls_participation(control_minus, control_plus)
+
+    def controls_participation(self, control_minus, control_plus):
+        if self.control_type == ControlType.PIECEWISE_LINEAR:
+            if self.discrete_approximation == QuadratureRule.MIDPOINT:
+                return (control_minus + control_plus) / 2 * self.time_step
+            elif self.discrete_approximation == QuadratureRule.LEFT_APPROXIMATION:
+                return control_minus * self.time_step
+            elif self.discrete_approximation == QuadratureRule.RIGHT_APPROXIMATION:
+                return control_plus * self.time_step
+            elif self.discrete_approximation == QuadratureRule.TRAPEZOIDAL:
+                raise NotImplementedError(
+                    f"Discrete {self.discrete_approximation} is not implemented for {self.control_type}"
+                )
+            else:
+                raise NotImplementedError(
+                    f"Discrete {self.discrete_approximation} is not implemented"
+                )
+        elif self.control_type == ControlType.PIECEWISE_CONSTANT:
+            return control_minus * self.time_step
+        else:
+            raise NotImplementedError(
+                f"{self.control_type} is not implemented"
+            )
 
     def integrate(self):
         """
@@ -449,6 +353,13 @@ class VariationalIntegrator:
             lambdas_num = np.zeros((0, self.nb_steps))
 
         for i in range(2, self.nb_steps):
+
+            if self.controls is not None:
+                u_prev = self.controls[:, i - 2]
+                u_cur = self.controls[:, i - 1]
+            else:
+                u_prev = None
+                u_cur = None
 
             # f(q_prev, q_cur, q_next) = 0, only q_next is unknown
             ifcn = self._declare_residuals(q_prev, q_cur, control_minus=u_prev, control_plus=u_cur)

@@ -115,6 +115,7 @@ def discrete_total_energy(biomodel: bionc.BiomechanicalModel, q: np.ndarray, tim
         discrete_total_energy[i] = discrete_total_energy_i(biorbd_model, q[:, i], q[:, i + 1], time_step)
     return discrete_total_energy
 
+
 def twenty_pendulum():
     biomodel = bionc.BiomechanicalModel.load(Models.TWENTY_PENDULUM.value)
     casadi_biomodel = biomodel.to_mx()
@@ -126,13 +127,24 @@ def twenty_pendulum():
     dt = 0.05
 
     results = pd.DataFrame(
-        columns=
-        ['time', 'time_steps',
-         'states','q', 'qdot', "lagrange_multipliers",
-         'Etot', 'Ekin', 'Epot',
-         'Phi_r', 'Phi_j',
-         'Phi_rdot', 'Phi_jdot',
-         'Phi_rddot', 'Phi_jddot',])
+        columns=[
+            "time",
+            "time_steps",
+            "states",
+            "q",
+            "qdot",
+            "lagrange_multipliers",
+            "Etot",
+            "Ekin",
+            "Epot",
+            "Phi_r",
+            "Phi_j",
+            "Phi_rdot",
+            "Phi_jdot",
+            "Phi_rddot",
+            "Phi_jddot",
+        ]
+    )
 
     sim_rk4 = StandardSim(biomodel, final_time=time, dt=dt, RK="RK4")
     sim_rk45 = StandardSim(biomodel, final_time=time, dt=dt, RK="RK45")
@@ -140,9 +152,9 @@ def twenty_pendulum():
     sim_rk4.plot_Q()
     sim_rk45.plot_Q()
 
-    all_q_t0 = sim_rk4.results["q"][:biomodel.nb_Q, 0:1]
+    all_q_t0 = sim_rk4.results["q"][: biomodel.nb_Q, 0:1]
     # get the q at the second frame for the discrete euler lagrange equation
-    all_q_t1 = sim_rk4.results["q"][:biomodel.nb_Q, 1:2]
+    all_q_t1 = sim_rk4.results["q"][: biomodel.nb_Q, 1:2]
 
     results_VI = dict()
     # variational integrator
@@ -162,51 +174,26 @@ def twenty_pendulum():
     results_VI["q"] = q_vi
     results_VI["lagrange_multipliers"] = lambdas_vi
 
-    plot(q=results_RK4["states"][:biomodel.nb_Q, :], time_steps=results_RK4["time_steps"])
-    plot(q=results_RK45["states"][:biomodel.nb_Q, :], time_steps=results_RK45["time_steps"])
-    plot(q=results_VI["q"][:biomodel.nb_Q, :], time_steps=results_RK4["time_steps"][:-1])
+    plot(q=results_RK4["states"][: biomodel.nb_Q, :], time_steps=results_RK4["time_steps"])
+    plot(q=results_RK45["states"][: biomodel.nb_Q, :], time_steps=results_RK45["time_steps"])
+    plot(q=results_VI["q"][: biomodel.nb_Q, :], time_steps=results_RK4["time_steps"][:-1])
     plt.show()
 
 
 def plot(q, time_steps):
-
     fig, axs = plt.subplots(4, 2)
-    axs[0, 0].plot(
-        time_steps, q[0, :], label="Variational Integrator", color="red", linestyle="-"
-    )
-    axs[0, 0].plot(
-        time_steps, q[1, :], label="Variational Integrator", color="green", linestyle="-"
-    )
-    axs[0, 0].plot(
-        time_steps, q[2, :], label="Variational Integrator", color="blue", linestyle="-"
-    )
-    axs[1, 0].plot(
-        time_steps, q[3, :], label="Variational Integrator", color="red", linestyle="-"
-    )
-    axs[1, 0].plot(
-        time_steps, q[4, :], label="Variational Integrator", color="green", linestyle="-"
-    )
-    axs[1, 0].plot(
-        time_steps, q[5, :], label="Variational Integrator", color="blue", linestyle="-"
-    )
-    axs[2, 0].plot(
-        time_steps, q[6, :], label="Variational Integrator", color="red", linestyle="-"
-    )
-    axs[2, 0].plot(
-        time_steps, q[7, :], label="Variational Integrator", color="green", linestyle="-"
-    )
-    axs[2, 0].plot(
-        time_steps, q[8, :], label="Variational Integrator", color="blue", linestyle="-"
-    )
-    axs[3, 0].plot(
-        time_steps, q[9, :], label="Variational Integrator", color="red", linestyle="-"
-    )
-    axs[3, 0].plot(
-        time_steps, q[10, :], label="Variational Integrator", color="green", linestyle="-"
-    )
-    axs[3, 0].plot(
-        time_steps, q[11, :], label="Variational Integrator", color="blue", linestyle="-"
-    )
+    axs[0, 0].plot(time_steps, q[0, :], label="Variational Integrator", color="red", linestyle="-")
+    axs[0, 0].plot(time_steps, q[1, :], label="Variational Integrator", color="green", linestyle="-")
+    axs[0, 0].plot(time_steps, q[2, :], label="Variational Integrator", color="blue", linestyle="-")
+    axs[1, 0].plot(time_steps, q[3, :], label="Variational Integrator", color="red", linestyle="-")
+    axs[1, 0].plot(time_steps, q[4, :], label="Variational Integrator", color="green", linestyle="-")
+    axs[1, 0].plot(time_steps, q[5, :], label="Variational Integrator", color="blue", linestyle="-")
+    axs[2, 0].plot(time_steps, q[6, :], label="Variational Integrator", color="red", linestyle="-")
+    axs[2, 0].plot(time_steps, q[7, :], label="Variational Integrator", color="green", linestyle="-")
+    axs[2, 0].plot(time_steps, q[8, :], label="Variational Integrator", color="blue", linestyle="-")
+    axs[3, 0].plot(time_steps, q[9, :], label="Variational Integrator", color="red", linestyle="-")
+    axs[3, 0].plot(time_steps, q[10, :], label="Variational Integrator", color="green", linestyle="-")
+    axs[3, 0].plot(time_steps, q[11, :], label="Variational Integrator", color="blue", linestyle="-")
 
     # for i in range(biomodel.nb_rigid_body_constraints):
     #     axs[0, 1].plot(
