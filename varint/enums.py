@@ -28,5 +28,5 @@ class ControlType(Enum):
     The different control types
     """
 
-    PIECEWISE_CONSTANT = "piecewise constant"
-    PIECEWISE_LINEAR = "piecewise linear"
+    PIECEWISE_CONSTANT = "piecewise_constant"
+    PIECEWISE_LINEAR = "piecewise_linear"

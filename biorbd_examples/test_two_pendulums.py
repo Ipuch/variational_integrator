@@ -11,7 +11,7 @@ from varint.minimal_variational_integrator import VariationalIntegrator
 from utils import *
 
 
-def two_pendulums():
+def test_two_pendulums():
     biorbd_casadi_model = biorbd_casadi.Model(Models.TWO_PENDULUMS.value)
     biorbd_model = biorbd.Model(Models.TWO_PENDULUMS.value)
 
@@ -22,9 +22,13 @@ def two_pendulums():
 
     tic0 = t.time()
 
+    # Rotations at t0
     q_t0 = np.array([1.54, 1.54])
+    # Translations between Seg0 and Seg1 at t0, calculated with cos and sin as Seg1 has no parent
     t_t0 = np.array([np.sin(q_t0[0]), -np.cos(q_t0[0])])
+    # Rotations at t1
     q_t1 = np.array([1.545, 1.545])
+    # Translations between Seg0 and Seg1 at t1, calculated with cos and sin as Seg1 has no parent
     t_t1 = np.array([np.sin(q_t1[0]), -np.cos(q_t1[0])])
 
     all_q_t0 = np.array([q_t0[0], t_t0[0], t_t0[1], q_t0[1]])
@@ -92,21 +96,11 @@ def two_pendulums():
     axs[2, 1].set_title("lambda1")
     axs[0, 0].legend()
 
-    # plot total energy for both methods
-    q_coord_rel = [q_vi[0, :]]
-    for i in range(1, 2):
-        q_coord_rel.append(q_vi[3 * i, :] - q_vi[3 * (i - 1), :])
-    q_coord_rel = np.asarray(q_coord_rel)
-
-    #plt.figure()
-    #plt.plot(discrete_total_energy(biorbd_model, q_coord_rel, time_step), label="RBDL")
-    #plt.plot(energy_calculation(biorbd_model, q_vi, 2, time_step), label="Amandine")
-    #plt.legend()
-
-    #plt.figure()
-    #plt.plot(discrete_total_energy(biorbd_model, q_coord_rel, time_step), label="Variational Integrator", color="red")
-    #plt.title("Total energy")
-    #plt.legend()
+    # Plot total energy
+    plt.figure()
+    plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step), label="Variational Integrator", color="red")
+    plt.title("Total energy with variational integrator")
+    plt.legend()
 
     # verify the constraint respect
     plt.figure()
@@ -117,6 +111,11 @@ def two_pendulums():
 
     plt.show()
 
+    np.testing.assert_almost_equal(
+        q_vi[:, -1],
+        [0.16117,  0.16047, -0.98704, -1.12458],
+        decimal=5,
+    )
     return print("Hello World")
 
 

@@ -90,6 +90,10 @@ class VariationalIntegrator:
 
         # self.force_approximation = force_approximation
 
+        if jac is None:
+            q_sym = MX.sym("q", (biorbd_model.nbQ(), 1))
+            self.jac = Function("no_constraint", [q_sym], [MX.zeros(q_init.shape)], ["q"], ["zero"]).expand()
+
         self._declare_mx()
         self._declare_discrete_euler_lagrange_equations()
         self.newton_descent_tolerance = newton_descent_tolerance
@@ -303,11 +307,11 @@ class VariationalIntegrator:
 
         if self.constraints is not None:
             pi_current = self.jac(q_cur)
-            return p_current + D1_Ld_qcur_qnext - transpose(pi_current) @ lambdas + self.controls_participation(control_minus, control_plus)
+            return p_current + D1_Ld_qcur_qnext - transpose(pi_current) @ lambdas + self.control_approximation(control_minus, control_plus)
         else:
-            return p_current + D1_Ld_qcur_qnext + self.controls_participation(control_minus, control_plus)
+            return p_current + D1_Ld_qcur_qnext + self.control_approximation(control_minus, control_plus)
 
-    def controls_participation(self, control_minus, control_plus):
+    def control_approximation(self, control_minus, control_plus):
         if self.control_type == ControlType.PIECEWISE_LINEAR:
             if self.discrete_approximation == QuadratureRule.MIDPOINT:
                 return (control_minus + control_plus) / 2 * self.time_step

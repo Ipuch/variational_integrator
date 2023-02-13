@@ -2,6 +2,8 @@
 This script is used to integrate the motion with a variational integrator based on the discrete Lagrangian,
 and a first order quadrature method.
 """
+import copy
+
 import biorbd_casadi
 
 from casadi import MX, jacobian, Function
@@ -11,7 +13,7 @@ from varint.minimal_variational_integrator import VariationalIntegrator, Quadrat
 from utils import *
 
 
-def one_pendulum_force():
+def test_one_pendulum_force():
     biorbd_casadi_model = biorbd_casadi.Model(Models.ONE_PENDULUM.value)
     biorbd_model = biorbd.Model(Models.ONE_PENDULUM.value)
 
@@ -92,7 +94,6 @@ def one_pendulum_force():
     axs[1, 1].set_title("lambda2")
 
     # plot total energy for both methods
-    W = torque * (q_vi[2, :] - q_vi[2, 0])
 
     CoM_marker = 2
     # Rotational kinetic energy
@@ -111,7 +112,7 @@ def one_pendulum_force():
     Ep = biorbd_model.segments()[0].characteristics().mass() * 9.81 * z_com
 
     plt.figure()
-    plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step).reshape(discrete_total_energy(biorbd_model, q_vi, time_step).shape[0]) - W[:-1], label="Total energy")
+    plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step).reshape(discrete_total_energy(biorbd_model, q_vi, time_step).shape[0]) - work(tau, q_vi)[:-1], label="Total energy")
     # plt.plot(Ec, label="Amandine Ec")
     # plt.plot(Ep, label="Amandine Ep")
     plt.plot(Ec + Ep[:-1], label="Amandine Em")
@@ -128,8 +129,9 @@ def one_pendulum_force():
 
     plt.show()
 
+    np.testing.assert_almost_equal(q_vi[:, -1], [0.0, 0.0, 1.00185644e+03], decimal=5)
+
     return print("Hello World")
 
-
 if __name__ == "__main__":
-    one_pendulum_force()
+    test_one_pendulum_force()

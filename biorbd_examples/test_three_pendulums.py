@@ -11,9 +11,9 @@ from varint.minimal_variational_integrator import VariationalIntegrator
 from utils import *
 
 
-def three_pendulums():
+def test_three_pendulums():
     biorbd_casadi_model = biorbd_casadi.Model(Models.THREE_PENDULUMS.value)
-    biorbd_model = biorbd.Model(Models.TRIPLE_PENDULUM.value)
+    biorbd_model = biorbd.Model(Models.THREE_PENDULUMS.value)
 
     import time as t
 
@@ -24,16 +24,16 @@ def three_pendulums():
 
     # Rotations at t0
     q_t0 = np.array([1.54, 1.54, 1.54])
-    # Translations between Seg1 and Seg2 at t0
-    t1_t0 = biorbd_model.globalJCS(np.array([1.54, 0.0, 0.0]), 1).to_array()[1:3, 3]
-    # Translations between Seg2 and Seg3 at t0
-    t2_t0 = biorbd_model.globalJCS(np.array([1.54, 0.0, 0.0]), 2).to_array()[1:3, 3]
+    # Translations between Seg0 and Seg1 at t0, calculated with cos and sin as Seg1 has no parent
+    t1_t0 = np.array([np.sin(q_t0[0]), -np.cos(q_t0[0])])
+    # Translations between Seg1 and Seg2 at t0, calculated with cos and sin as Seg2 has no parent
+    t2_t0 = np.array([2 * np.sin(q_t0[1]), - 2 * np.cos(q_t0[1])])
     # Rotations at t1
     q_t1 = np.array([1.545, 1.545, 1.545])
-    # Translations between Seg1 and Seg2 at t1
-    t1_t1 = biorbd_model.globalJCS(np.array([1.545, 0.0, 0.0]), 1).to_array()[1:3, 3]
-    # Translations between Seg2 and Seg3 at t1
-    t2_t1 = biorbd_model.globalJCS(np.array([1.545, 0.0, 0.0]), 2).to_array()[1:3, 3]
+    # Translations between Seg0 and Seg1 at t1, calculated with cos and sin as Seg1 has no parent
+    t1_t1 = np.array([np.sin(q_t1[0]), -np.cos(q_t1[0])])
+    # Translations between Seg1 and Seg2 at t1, calculated with cos and sin as Seg2 has no parent
+    t2_t1 = np.array([2 * np.sin(q_t1[1]), - 2 * np.cos(q_t1[1])])
 
     all_q_t0 = np.array([q_t0[0], t1_t0[0], t1_t0[1], q_t0[1], t2_t0[0], t2_t0[1], q_t0[2]])
     all_q_t1 = np.array([q_t1[0], t1_t1[0], t1_t1[1], q_t1[1], t2_t1[0], t2_t1[1], q_t1[2]])
@@ -125,19 +125,9 @@ def three_pendulums():
     axs[4, 1].set_title("lambda2")
     axs[5, 0].set_title("lambda3")
 
-    # Plot total energy for both methods
-    q_coord_rel = [q_vi[0, :]]
-    for i in range(1, 2):
-        q_coord_rel.append(q_vi[3 * i, :] - q_vi[3 * (i - 1), :])
-    q_coord_rel = np.asarray(q_coord_rel)
-
+    # Plot total energy
     plt.figure()
-    plt.plot(discrete_total_energy(biorbd_model, q_coord_rel, time_step), label="RBDL")
-    plt.plot(energy_calculation(biorbd_model, q_vi, 3, time_step), label="Amandine")
-    plt.legend()
-
-    plt.figure()
-    plt.plot(discrete_total_energy(biorbd_model, q_coord_rel, time_step), color="red")
+    plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step), color="red")
     plt.title("Total energy with variational integrator")
 
     # Verify the constraint respect
@@ -151,8 +141,13 @@ def three_pendulums():
 
     plt.show()
 
-    return print("Hello World")
+    np.testing.assert_almost_equal(
+        q_vi[:, -1],
+        [1.10195427,  0.89209211, -0.45185359, -4.75058539,  1.89136272, -0.49004071, -2.45799676],
+        decimal=5,
+    )
 
+    return print("Hello World")
 
 if __name__ == "__main__":
     three_pendulums()

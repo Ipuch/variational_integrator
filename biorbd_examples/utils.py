@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 import biorbd
 
 from enum import Enum
@@ -135,7 +136,8 @@ def discrete_total_energy(biorbd_model: biorbd.Model, q: np.ndarray, time_step) 
 
 def energy_calculation(biorbd_model, q, n, time_step):
     """
-    This function can only be used for the examples two_pendulums and three_pendulums
+    This function can only be used for the examples two_pendulums and three_pendulums, it was used to understand how
+    RBDL calculates. However, it is not really useful now.
 
     Parameters
     ----------
@@ -162,20 +164,20 @@ def energy_calculation(biorbd_model, q, n, time_step):
     for Seg in range(n):
         CoM_marker = Seg * 3 + 2
         # Rotational kinetic energy
-        I_G = biorbd_model.segments()[0].characteristics().inertia().to_array()
+        I_G = biorbd_model.segments()[Seg].characteristics().inertia().to_array()
         q_coord_rel_dot = (q_coord_rel[Seg, 1:] - q_coord_rel[Seg, :-1]) / time_step
         Ec_rot = 1 / 2 * I_G[0, 0] * q_coord_rel_dot**2
         # Translational kinetic energy
         y_com = np.asarray(
-            [biorbd_model.markers(q_coord_rel[:, i])[CoM_marker].to_array()[1] for i in range(len(q_coord_rel[0, :]))]
+            [biorbd_model.markers(q[:, i])[CoM_marker].to_array()[1] for i in range(len(q[0, :]))]
         )
         z_com = np.asarray(
-            [biorbd_model.markers(q_coord_rel[:, i])[CoM_marker].to_array()[2] for i in range(len(q_coord_rel[0, :]))]
+            [biorbd_model.markers(q[:, i])[CoM_marker].to_array()[2] for i in range(len(q[0, :]))]
         )
         vy_com = (y_com[1:] - y_com[:-1]) / time_step
         vz_com = (z_com[1:] - z_com[:-1]) / time_step
         V_com_sq = vy_com**2 + vz_com**2
-        Ec_trs = 1 / 2 * biorbd_model.segments()[0].characteristics().mass() * V_com_sq
+        Ec_trs = 1 / 2 * biorbd_model.segments()[Seg].characteristics().mass() * V_com_sq
 
         Ec.append(Ec_trs + Ec_rot)
 
@@ -183,3 +185,25 @@ def energy_calculation(biorbd_model, q, n, time_step):
         Ep.append(biorbd_model.segments()[Seg].characteristics().mass() * g * z_com)
 
     return np.sum(np.asarray(Ep)[:, :-1], axis=0) + np.sum(Ec, axis=0)
+
+
+def work(controls, q):
+    """
+    Compute the discrete total energy of a biorbd model
+    /!\ Only works with constant work (test_one_pendulum_force.py)
+
+    Parameters
+    ----------
+    controls: np.ndarray
+        The controls
+    q: np.ndarray
+        The generalized coordinates
+
+    Returns
+    -------
+    The total work produced by all the controls
+    """
+    delta = copy.deepcopy(q)
+    for i in range(delta.shape[0]):
+        delta[i, :] -= q[i, 0]
+    return np.sum(controls * delta, axis=0)
