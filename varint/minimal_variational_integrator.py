@@ -304,14 +304,25 @@ class VariationalIntegrator:
         p_current = self.compute_p_current(q_prev, q_cur)  # momentum at current time step
 
         D1_Ld_qcur_qnext = transpose(jacobian(self.discrete_lagrangian(q_cur, q_next), q_cur))
+        constraint_term = transpose(self.jac(q_cur)) @ lambdas if self.constraints is not None else MX.zeros(p_current.shape)
 
-        if self.constraints is not None:
-            pi_current = self.jac(q_cur)
-            return p_current + D1_Ld_qcur_qnext - transpose(pi_current) @ lambdas + self.control_approximation(control_minus, control_plus)
-        else:
-            return p_current + D1_Ld_qcur_qnext + self.control_approximation(control_minus, control_plus)
+        return p_current + D1_Ld_qcur_qnext - constraint_term + self.control_approximation(control_minus, control_plus)
 
     def control_approximation(self, control_minus, control_plus):
+        """
+
+
+        Parameters
+        ----------
+        control_minus: float
+            The control corresponding to qprec
+        control_plus: float
+            The control corresponding to qnext
+
+        Returns
+        ----------
+        The term associated to the controls in the langrangian equations, sum of f- and f+
+        """
         if self.control_type == ControlType.PIECEWISE_LINEAR:
             if self.discrete_approximation == QuadratureRule.MIDPOINT:
                 return (control_minus + control_plus) / 2 * self.time_step
@@ -328,6 +339,8 @@ class VariationalIntegrator:
                     f"Discrete {self.discrete_approximation} is not implemented"
                 )
         elif self.control_type == ControlType.PIECEWISE_CONSTANT:
+            # If the control type is piecewise constant, the approximation if the same no matter which quadrature rule
+            # has been chosen
             return control_minus * self.time_step
         else:
             raise NotImplementedError(

@@ -1,8 +1,11 @@
 import numpy as np
+from pathlib import Path
 import copy
 import biorbd
 
 from enum import Enum
+
+UNIT_DATA = Path(__file__).parent
 
 
 class Models(Enum):
@@ -10,12 +13,12 @@ class Models(Enum):
     The different models
     """
 
-    PENDULUM = "models/pendulum.bioMod"
-    ONE_PENDULUM = "models/one_pendulum.bioMod"
-    DOUBLE_PENDULUM = "models/double_pendulum.bioMod"
-    TWO_PENDULUMS = "models/two_pendulums.bioMod"
-    TRIPLE_PENDULUM = "models/triple_pendulum.bioMod"
-    THREE_PENDULUMS = "models/three_pendulums.bioMod"
+    PENDULUM = str(UNIT_DATA / "biorbd_examples/models/pendulum.bioMod")
+    ONE_PENDULUM = str(UNIT_DATA / "biorbd_examples/models/one_pendulum.bioMod")
+    DOUBLE_PENDULUM = str(UNIT_DATA / "biorbd_examples/models/double_pendulum.bioMod")
+    TWO_PENDULUMS = str(UNIT_DATA / "biorbd_examples/models/two_pendulums.bioMod")
+    TRIPLE_PENDULUM = str(UNIT_DATA / "biorbd_examples/models/triple_pendulum.bioMod")
+    THREE_PENDULUMS = str(UNIT_DATA / "biorbd_examples/models/three_pendulums.bioMod")
 
 
 def forward_dynamics(biorbd_model: biorbd.Model, q: np.ndarray, qdot: np.ndarray, tau: np.ndarray) -> np.ndarray:
@@ -81,7 +84,7 @@ def total_energy(biorbd_model: biorbd.Model, q: np.ndarray, qdot: np.ndarray) ->
     """
     H = np.zeros((q.shape[0]))
     for i in range(q.shape[0]):
-        H[i] = total_energy_i(biorbd_model, q[i : i + 1], qdot[i : i + 1])
+        H[i] = total_energy_i(biorbd_model, q[i: i + 1], qdot[i: i + 1])
 
     return H
 
@@ -166,7 +169,7 @@ def energy_calculation(biorbd_model, q, n, time_step):
         # Rotational kinetic energy
         I_G = biorbd_model.segments()[Seg].characteristics().inertia().to_array()
         q_coord_rel_dot = (q_coord_rel[Seg, 1:] - q_coord_rel[Seg, :-1]) / time_step
-        Ec_rot = 1 / 2 * I_G[0, 0] * q_coord_rel_dot**2
+        Ec_rot = 1 / 2 * I_G[0, 0] * q_coord_rel_dot ** 2
         # Translational kinetic energy
         y_com = np.asarray(
             [biorbd_model.markers(q[:, i])[CoM_marker].to_array()[1] for i in range(len(q[0, :]))]
@@ -176,7 +179,7 @@ def energy_calculation(biorbd_model, q, n, time_step):
         )
         vy_com = (y_com[1:] - y_com[:-1]) / time_step
         vz_com = (z_com[1:] - z_com[:-1]) / time_step
-        V_com_sq = vy_com**2 + vz_com**2
+        V_com_sq = vy_com ** 2 + vz_com ** 2
         Ec_trs = 1 / 2 * biorbd_model.segments()[Seg].characteristics().mass() * V_com_sq
 
         Ec.append(Ec_trs + Ec_rot)

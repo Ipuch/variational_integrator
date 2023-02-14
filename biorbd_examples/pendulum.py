@@ -1,6 +1,7 @@
 """
 This script is used to integrate the motion with a variational integrator based on the discrete Lagrangian,
 and a first order quadrature method.
+This example is a simple pendulum and compares the integrations obtained by 3 different integrators.
 """
 import biorbd_casadi
 
@@ -9,14 +10,11 @@ from varint.minimal_variational_integrator import VariationalIntegrator
 from utils import *
 
 
-def pendulum():
+def pendulum(time: float = 600, time_step: float = 0.01, unit_test: bool = False):
     biorbd_casadi_model = biorbd_casadi.Model(Models.PENDULUM.value)
     biorbd_model = biorbd.Model(Models.PENDULUM.value)
 
     import time as t
-
-    time = 6
-    time_step = 0.01
 
     multistep_integrator = "DOP853"  # DOP853
 
@@ -50,27 +48,28 @@ def pendulum():
     tic2 = t.time()
     print(tic2 - tic1)
 
-    import matplotlib.pyplot as plt
+    if unit_test:
+        import matplotlib.pyplot as plt
 
-    plt.figure()
-    plt.plot(q_vi[0, 1:], label="Variational Integrator", color="red", linestyle="-", marker="", markersize=2)
-    plt.plot(q_rk45[0, 0:-1], label=multistep_integrator, color="blue", linestyle="-", marker="", markersize=2)
-    plt.plot(q_rk4[0, 0:-1], label="RK4", color="green", linestyle="-", marker="", markersize=2)
-    plt.title(f"Generalized coordinates comparison between RK45, {multistep_integrator} and variational integrator")
-    plt.legend()
+        plt.figure()
+        plt.plot(q_vi[0, 1:], label="Variational Integrator", color="red", linestyle="-", marker="", markersize=2)
+        plt.plot(q_rk45[0, 0:-1], label=multistep_integrator, color="blue", linestyle="-", marker="", markersize=2)
+        plt.plot(q_rk4[0, 0:-1], label="RK4", color="green", linestyle="-", marker="", markersize=2)
+        plt.title(f"Generalized coordinates comparison between RK45, {multistep_integrator} and variational integrator")
+        plt.legend()
 
-    # plot total energy for both methods
-    plt.figure()
-    plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step), label="Variational Integrator", color="red")
-    plt.plot(total_energy(biorbd_model, q_rk45[0, :], q_rk45[1, :]), label=multistep_integrator, color="blue")
-    plt.plot(total_energy(biorbd_model, q_rk4[0, :], q_rk4[1, :]), label="RK4", color="green")
-    plt.title(f"Total energy comparison between RK45, {multistep_integrator} and variational integrator")
-    plt.legend()
+        # plot total energy for both methods
+        plt.figure()
+        plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step), label="Variational Integrator", color="red")
+        plt.plot(total_energy(biorbd_model, q_rk45[0, :], q_rk45[1, :]), label=multistep_integrator, color="blue")
+        plt.plot(total_energy(biorbd_model, q_rk4[0, :], q_rk4[1, :]), label="RK4", color="green")
+        plt.title(f"Total energy comparison between RK45, {multistep_integrator} and variational integrator")
+        plt.legend()
 
-    plt.show()
+        plt.show()
 
-    return print("Hello World")
+    return q_vi
 
 
 if __name__ == "__main__":
-    pendulum()
+    pendulum(unit_test=True)

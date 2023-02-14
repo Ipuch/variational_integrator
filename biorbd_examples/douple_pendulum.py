@@ -1,6 +1,7 @@
 """
 This script is used to integrate the motion with a variational integrator based on the discrete Lagrangian,
 and a first order quadrature method.
+This example is a double pendulum and compares the integrations obtained by 3 different integrators.
 """
 import biorbd_casadi
 
@@ -9,14 +10,12 @@ from varint.minimal_variational_integrator import VariationalIntegrator, Quadrat
 from utils import *
 
 
-def double_pendulum():
+def double_pendulum(time: float = 60, time_step: float = 0.05, unit_test: bool = False):
     biorbd_casadi_model = biorbd_casadi.Model(Models.DOUBLE_PENDULUM.value)
     biorbd_model = biorbd.Model(Models.DOUBLE_PENDULUM.value)
 
     import time as t
 
-    time = 60
-    time_step = 0.05
     # multistep_integrator = "RK45"  # DOP853
     multistep_integrator = "DOP853"  # DOP853
 
@@ -51,74 +50,75 @@ def double_pendulum():
     tic2 = t.time()
     print(tic2 - tic1)
 
-    import bioviz
+    if unit_test:
+        import bioviz
 
-    b = bioviz.Viz(Models.DOUBLE_PENDULUM.value)
-    b.load_movement(q_vi)
-    b.exec()
+        b = bioviz.Viz(Models.DOUBLE_PENDULUM.value)
+        b.load_movement(q_vi)
+        b.exec()
 
-    import matplotlib.pyplot as plt
+        import matplotlib.pyplot as plt
 
-    fig, axs = plt.subplots(2, 1)
-    axs[0].plot(
-        np.arange(0, time, time_step),
-        q_vi[0, :],
-        label="Variational Integrator",
-        color="red",
-        linestyle="-",
-        marker="",
-        markersize=2,
-    )
-    axs[0].plot(
-        np.arange(0, time, time_step),
-        q_rk45[0, :],
-        label=multistep_integrator,
-        color="blue",
-        linestyle="-",
-        marker="",
-        markersize=2,
-    )
-    axs[0].plot(
-        np.arange(0, time, time_step), q_rk4[0, :], label="RK4", color="green", linestyle="-", marker="", markersize=2
-    )
-    axs[0].set_title("q0")
-    axs[0].legend()
-    axs[1].plot(
-        np.arange(0, time, time_step),
-        q_vi[1, :],
-        label="Variational Integrator",
-        color="red",
-        linestyle="-",
-        marker="",
-        markersize=2,
-    )
-    axs[1].plot(
-        np.arange(0, time, time_step),
-        q_rk45[1, :],
-        label=multistep_integrator,
-        color="blue",
-        linestyle="-",
-        marker="",
-        markersize=2,
-    )
-    axs[1].plot(
-        np.arange(0, time, time_step), q_rk4[1, :], label="RK4", color="green", linestyle="-", marker="", markersize=2
-    )
-    axs[1].set_title("q1")
-    axs[1].legend()
+        fig, axs = plt.subplots(2, 1)
+        axs[0].plot(
+            np.arange(0, time, time_step),
+            q_vi[0, :],
+            label="Variational Integrator",
+            color="red",
+            linestyle="-",
+            marker="",
+            markersize=2,
+        )
+        axs[0].plot(
+            np.arange(0, time, time_step),
+            q_rk45[0, :],
+            label=multistep_integrator,
+            color="blue",
+            linestyle="-",
+            marker="",
+            markersize=2,
+        )
+        axs[0].plot(
+            np.arange(0, time, time_step), q_rk4[0, :], label="RK4", color="green", linestyle="-", marker="", markersize=2
+        )
+        axs[0].set_title("q0")
+        axs[0].legend()
+        axs[1].plot(
+            np.arange(0, time, time_step),
+            q_vi[1, :],
+            label="Variational Integrator",
+            color="red",
+            linestyle="-",
+            marker="",
+            markersize=2,
+        )
+        axs[1].plot(
+            np.arange(0, time, time_step),
+            q_rk45[1, :],
+            label=multistep_integrator,
+            color="blue",
+            linestyle="-",
+            marker="",
+            markersize=2,
+        )
+        axs[1].plot(
+            np.arange(0, time, time_step), q_rk4[1, :], label="RK4", color="green", linestyle="-", marker="", markersize=2
+        )
+        axs[1].set_title("q1")
+        axs[1].legend()
 
-    # plot total energy for both methods
-    plt.figure()
-    plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step), label="Variational Integrator", color="red")
-    plt.plot(total_energy(biorbd_model, q_rk45[0, :], q_rk45[1, :]), label=multistep_integrator, color="blue")
-    plt.plot(total_energy(biorbd_model, q_rk4[0, :], q_rk4[1, :]), label="RK4", color="green")
-    plt.title(f"Total energy comparison between RK45, {multistep_integrator} and variational integrator")
-    plt.legend()
+        # plot total energy for both methods
+        plt.figure()
+        plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step), label="Variational Integrator", color="red")
+        plt.plot(total_energy(biorbd_model, q_rk45[0, :], q_rk45[1, :]), label=multistep_integrator, color="blue")
+        plt.plot(total_energy(biorbd_model, q_rk4[0, :], q_rk4[1, :]), label="RK4", color="green")
+        plt.title(f"Total energy comparison between RK45, {multistep_integrator} and variational integrator")
+        plt.legend()
 
-    plt.show()
+        plt.show()
 
-    return print("Hello World")
+    return q_vi
 
 
 if __name__ == "__main__":
-    double_pendulum()
+    double_pendulum(unit_test=True)

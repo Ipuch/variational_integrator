@@ -1,8 +1,10 @@
 """
 This script is used to integrate the motion with a variational integrator based on the discrete Lagrangian,
 and a first order quadrature method.
-This example is a simple pendulum freed and constrained in translation on the y-axis and the z-axis.
+This example is a simple pendulum freed and constrained in translation on the y-axis and the z-axis and controlled by a
+constant torque.
 """
+
 import biorbd_casadi
 
 from casadi import MX, jacobian, Function
@@ -12,11 +14,13 @@ from varint.minimal_variational_integrator import VariationalIntegrator, Quadrat
 from utils import *
 
 
-def one_pendulum(time: float = 10, time_step: float = 0.05, unit_test: bool = False):
+def one_pendulum_force(time: float = 10, time_step: float = 0.05, unit_test: bool = False):
     biorbd_casadi_model = biorbd_casadi.Model(Models.ONE_PENDULUM.value)
     biorbd_model = biorbd.Model(Models.ONE_PENDULUM.value)
 
     import time as t
+
+    nb_frames = int(time / time_step)
 
     tic0 = t.time()
 
@@ -36,6 +40,11 @@ def one_pendulum(time: float = 10, time_step: float = 0.05, unit_test: bool = Fa
     # test the constraint
     print(fcn_constraint(all_q_t0))
 
+    # controls
+    torque = 20
+    tau = np.zeros((biorbd_model.nbGeneralizedTorque(), nb_frames))
+    tau[-1, :] = torque
+
     # variational integrator
     vi = VariationalIntegrator(
         biorbd_model=biorbd_casadi_model,
@@ -44,9 +53,9 @@ def one_pendulum(time: float = 10, time_step: float = 0.05, unit_test: bool = Fa
         constraints=fcn_constraint,
         jac=fcn_jacobian,
         discrete_approximation=QuadratureRule.TRAPEZOIDAL,
+        controls=tau,
         q_init=np.concatenate((all_q_t0[:, np.newaxis], all_q_t1[:, np.newaxis]), axis=1),
     )
-    # vi.set_initial_values(q_prev=1.54, q_cur=1.545)
     q_vi, lambdas_vi = vi.integrate()
 
     tic2 = t.time()
@@ -84,9 +93,11 @@ def one_pendulum(time: float = 10, time_step: float = 0.05, unit_test: bool = Fa
         axs[0, 1].set_title("lambda1")
         axs[1, 1].set_title("lambda2")
 
-        # plot total energy for both methods
+        # Plot total energy for both methods
         plt.figure()
-        plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step), label="Variational Integrator", color="red")
+        plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step).reshape(discrete_total_energy(biorbd_model, q_vi, time_step).shape[0]) - work(tau, q_vi)[:-1], label="Total energy")
+        plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step), label="Mechanical energy")
+        plt.legend()
         plt.title("Total energy")
 
         # verify the constraint respect
@@ -102,4 +113,4 @@ def one_pendulum(time: float = 10, time_step: float = 0.05, unit_test: bool = Fa
 
 
 if __name__ == "__main__":
-    one_pendulum(unit_test=True)
+    one_pendulum_force(unit_test=True)

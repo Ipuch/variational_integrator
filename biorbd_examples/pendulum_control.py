@@ -1,9 +1,11 @@
 """
 This script is used to integrate the motion with a variational integrator based on the discrete Lagrangian,
 and a first order quadrature method.
+This example is a simple pendulum controlled with a torque calculated by bioptim to move the pendulum from 0 rad to pi
+rad in 1 sec and 30 frames.
 """
 import biorbd_casadi
-
+from numpy import nan
 from varint.minimal_variational_integrator import VariationalIntegrator
 
 from utils import *
@@ -18,7 +20,7 @@ tau_optimal_control = np.asarray([[
         11.88936988, 10.5316134,   9.13412692,   7.71755652,   6.29825044,
         4.88754928,  3.49156338,   2.1113697,    0.74351136,   -0.61932967,
         -1.98760312, -3.37419226,  -4.79380495,  -6.26248594,  -7.79726463,
-        -9.41594264, -11.13702162, -12.97977061, -14.96443099, -17.11254998
+        -9.41594264, -11.13702162, -12.97977061, -14.96443099, -17.11254998, nan
     ]])
 
 q_optimal_control = [
@@ -32,14 +34,18 @@ q_optimal_control = [
 ]
 
 
-def pendulum(tau_optimal_control, q_optimal_control):
+def pendulum(
+        tau_optimal_control: np.ndarray = tau_optimal_control,
+        q_optimal_control: np.ndarray = q_optimal_control,
+        unit_test: bool = False
+):
     biorbd_casadi_model = biorbd_casadi.Model(Models.PENDULUM.value)
     biorbd_model = biorbd.Model(Models.PENDULUM.value)
 
     import time as t
 
     time = 1
-    time_step = 1/30
+    time_step = 1/31
 
     tic0 = t.time()
 
@@ -59,32 +65,33 @@ def pendulum(tau_optimal_control, q_optimal_control):
     tic1 = t.time()
     print(tic1 - tic0)
 
-    import bioviz
+    if unit_test:
+        import bioviz
 
-    b = bioviz.Viz(Models.PENDULUM.value)
-    b.load_movement(q_vi)
-    b.exec()
+        b = bioviz.Viz(Models.PENDULUM.value)
+        b.load_movement(q_vi)
+        b.exec()
 
-    import matplotlib.pyplot as plt
+        import matplotlib.pyplot as plt
 
-    plt.figure()
-    plt.plot(q_vi[0, :], label="Variational Integrator")
-    plt.plot(q_optimal_control, label="Optimal control")
-    plt.title(f"Generalized coordinates")
-    plt.legend()
+        plt.figure()
+        plt.plot(q_vi[0, :], label="Variational Integrator")
+        plt.plot(q_optimal_control, label="Optimal control")
+        plt.title(f"Generalized coordinates")
+        plt.legend()
 
-    # Plot total energy for both methods
-    plt.figure()
-    plt.plot(
-        discrete_total_energy(biorbd_model, q_vi, time_step),
-        label="Mechanical energy", color="red")
-    plt.title("Total energy")
-    plt.legend()
+        # Plot total energy for both methods
+        plt.figure()
+        plt.plot(
+            discrete_total_energy(biorbd_model, q_vi, time_step),
+            label="Mechanical energy", color="red")
+        plt.title("Total energy")
+        plt.legend()
 
-    plt.show()
+        plt.show()
 
-    return print("Hello World")
+    return q_vi
 
 
 if __name__ == "__main__":
-    pendulum(tau_optimal_control, q_optimal_control)
+    pendulum(tau_optimal_control, q_optimal_control, unit_test=True)
