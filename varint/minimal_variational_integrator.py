@@ -112,15 +112,16 @@ class VariationalIntegrator:
         else:
             self.lambdas = MX.sym("lambda", (0, 0))
 
-        self.control_minus = MX.sym("control_minus", self.biorbd_model.nbQ(), 1)
-        self.control_plus = MX.sym("control_plus", self.biorbd_model.nbQ(), 1)
+        self.control_prev = MX.sym("control_prev", self.biorbd_model.nbQ(), 1)
+        self.control_cur = MX.sym("control_cur", self.biorbd_model.nbQ(), 1)
+        self.control_next = MX.sym("control_next", self.biorbd_model.nbQ(), 1)
 
     def _declare_discrete_euler_lagrange_equations(self):
         """
         Declare the discrete Euler-Lagrange equations
         """
         # list of symbolic variables needed for the integration
-        self.sym_list = [self.q_prev, self.q_cur, self.q_next, self.lambdas, self.control_minus, self.control_plus]
+        self.sym_list = [self.q_prev, self.q_cur, self.q_next, self.lambdas, self.control_prev, self.control_cur, self.control_next]
 
         # output of the discrete Euler-Lagrange equations
         output = [
@@ -128,20 +129,21 @@ class VariationalIntegrator:
                 self.q_prev,
                 self.q_cur,
                 self.q_next,
-                self.control_minus,
-                self.control_plus,
+                self.control_prev,
+                self.control_cur,
+                self.control_next,
                 self.lambdas,
             )
         ]
 
         self.dela = Function(f"DEL", self.sym_list, output).expand()
 
-    def _declare_residuals(self, q_prev, q_cur, control_minus, control_plus):
+    def _declare_residuals(self, q_prev, q_cur, control_prev, control_cur, control_next):
         """
         This function declares the residuals of the discrete Euler-Lagrange equations to be solved implicitly. All the
         entries are numerical values.
         """
-        mx_residuals = self.dela(q_prev, q_cur, self.q_next, self.lambdas, control_minus, control_plus)
+        mx_residuals = self.dela(q_prev, q_cur, self.q_next, self.lambdas, control_prev, control_cur, control_next)
         decision_variables = self.q_next
 
         if (
@@ -279,8 +281,9 @@ class VariationalIntegrator:
         q_prev: MX | SX,
         q_cur: MX | SX,
         q_next: MX | SX,
-        control_minus: MX | SX,
-        control_plus: MX | SX,
+        control_prev: MX | SX,
+        control_cur: MX | SX,
+        control_next: MX | SX,
         lambdas: MX | SX = None,
     ) -> MX | SX:
         """
@@ -294,10 +297,12 @@ class VariationalIntegrator:
             The generalized coordinates at the second time step
         q_next: MX | SX
             The generalized coordinates at the third time step
-        control_minus: MX | SX
+        control_prev: MX | SX
             The generalized forces at the first time step
-        control_plus: MX | SX
+        control_cur: MX | SX
             The generalized forces at the second time step
+        control_next: MX | SX
+            The generalized forces at the third time step
         lambdas: MX | SX
             The Lagrange multipliers of second current time step
         """
@@ -306,30 +311,43 @@ class VariationalIntegrator:
         D1_Ld_qcur_qnext = transpose(jacobian(self.discrete_lagrangian(q_cur, q_next), q_cur))
         constraint_term = transpose(self.jac(q_cur)) @ lambdas if self.constraints is not None else MX.zeros(p_current.shape)
 
-        return p_current + D1_Ld_qcur_qnext - constraint_term + self.control_approximation(control_minus, control_plus)
+        return p_current + D1_Ld_qcur_qnext - constraint_term + self.control_approximation(control_prev, control_cur, control_next)
 
-    def control_approximation(self, control_minus, control_plus):
+    def control_approximation(
+        self,
+        control_prev: MX | SX,
+        control_cur: MX | SX,
+        control_next: MX | SX,
+    ):
         """
-
+        Compute the term associated to the discrete forcing.
 
         Parameters
         ----------
-        control_minus: float
-            The control corresponding to qprec
-        control_plus: float
-            The control corresponding to qnext
+        control_prev: MX | SX
+            fc(t_{k-1})
+        control_cur: MX | SX
+            fc(t_k)
+        control_next: MX | SX
+            fc(t_{k+1})
 
         Returns
         ----------
-        The term associated to the controls in the langrangian equations, sum of f- and f+
+        The term associated to the controls in the Lagrangian equations.
+        The notations are the same as in Johnson, E. R., & Murphey, T. D. (2009).
+        Scalable Variational Integrators for Constrained Mechanical Systems in Generalized Coordinates.
+        IEEE Transactions on Robotics, 25(6), 1249–1261. doi:10.1109/tro.2009.2032955
         """
         if self.control_type == ControlType.PIECEWISE_LINEAR:
             if self.discrete_approximation == QuadratureRule.MIDPOINT:
-                return (control_minus + control_plus) / 2 * self.time_step
+                fd_plus = 1 / 2 * (control_prev + control_cur) / 2 * self.time_step
+                fd_minus = 1 / 2 * (control_cur + control_next) / 2 * self.time_step
             elif self.discrete_approximation == QuadratureRule.LEFT_APPROXIMATION:
-                return control_minus * self.time_step
+                fd_plus = 1 / 2 * control_prev * self.time_step
+                fd_minus = 1 / 2 * control_cur * self.time_step
             elif self.discrete_approximation == QuadratureRule.RIGHT_APPROXIMATION:
-                return control_plus * self.time_step
+                fd_plus = 1 / 2 * control_cur * self.time_step
+                fd_minus = 1 / 2 * control_next * self.time_step
             elif self.discrete_approximation == QuadratureRule.TRAPEZOIDAL:
                 raise NotImplementedError(
                     f"Discrete {self.discrete_approximation} is not implemented for {self.control_type}"
@@ -338,14 +356,27 @@ class VariationalIntegrator:
                 raise NotImplementedError(
                     f"Discrete {self.discrete_approximation} is not implemented"
                 )
+
         elif self.control_type == ControlType.PIECEWISE_CONSTANT:
-            # If the control type is piecewise constant, the approximation if the same no matter which quadrature rule
-            # has been chosen
-            return control_minus * self.time_step
+            if self.discrete_approximation == QuadratureRule.MIDPOINT or self.discrete_approximation == QuadratureRule.TRAPEZOIDAL:
+                fd_plus = 1 / 2 * control_prev * self.time_step
+                fd_minus = 1 / 2 * control_cur * self.time_step
+            elif self.discrete_approximation == QuadratureRule.LEFT_APPROXIMATION:
+                fd_plus = 1 / 2 * control_prev * self.time_step
+                fd_minus = 1 / 2 * control_prev * self.time_step
+            elif self.discrete_approximation == QuadratureRule.RIGHT_APPROXIMATION:
+                fd_plus = 1 / 2 * control_cur * self.time_step
+                fd_minus = 1 / 2 * control_cur * self.time_step
+            else:
+                raise NotImplementedError(
+                    f"Discrete {self.discrete_approximation} is not implemented"
+                )
         else:
             raise NotImplementedError(
                 f"{self.control_type} is not implemented"
             )
+
+        return fd_minus + fd_plus
 
     def integrate(self):
         """
@@ -374,12 +405,14 @@ class VariationalIntegrator:
             if self.controls is not None:
                 u_prev = self.controls[:, i - 2]
                 u_cur = self.controls[:, i - 1]
+                u_next = self.controls[:, i]
             else:
                 u_prev = None
                 u_cur = None
+                u_next = None
 
             # f(q_prev, q_cur, q_next) = 0, only q_next is unknown
-            ifcn = self._declare_residuals(q_prev, q_cur, control_minus=u_prev, control_plus=u_cur)
+            ifcn = self._declare_residuals(q_prev, q_cur, control_prev=u_prev, control_cur=u_cur, control_next=u_next)
 
             # q_cur as an initial guess
             v_init = self._dispatch_to_v(q_cur, lambdas_num)
