@@ -5,7 +5,7 @@ This example is a double pendulum and compares the integrations obtained by 3 di
 """
 import biorbd_casadi
 
-from varint.minimal_variational_integrator import VariationalIntegrator, QuadratureRule
+from varint.minimal_variational_integrator import VariationalIntegrator
 
 from utils import *
 
@@ -109,7 +109,7 @@ def double_pendulum(time: float = 60, time_step: float = 0.05, unit_test: bool =
 
         # plot total energy for both methods
         plt.figure()
-        plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step), label="Variational Integrator", color="red")
+        plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step, discrete_approximation=QuadratureRule.MIDPOINT), label="Variational Integrator", color="red")
         plt.plot(total_energy(biorbd_model, q_rk45[0, :], q_rk45[1, :]), label=multistep_integrator, color="blue")
         plt.plot(total_energy(biorbd_model, q_rk4[0, :], q_rk4[1, :]), label="RK4", color="green")
         plt.title(f"Total energy comparison between RK45, {multistep_integrator} and variational integrator")

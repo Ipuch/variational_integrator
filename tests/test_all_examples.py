@@ -44,7 +44,7 @@ def test_pendulum_control():
 
     np.testing.assert_almost_equal(
         q_vi[:, -1],
-        [3.196070289107271],
+        [2.895386567812652],
         decimal=15,
     )
 

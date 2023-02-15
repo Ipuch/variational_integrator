@@ -141,9 +141,6 @@ def three_pendulums(time: float = 20, time_step: float = 0.05, unit_test = False
 
         plt.show()
 
-    np.set_printoptions(formatter={'float': lambda q_vi: "{0:0.15f}".format(q_vi)})
-    print(q_vi[:, -1])
-
     return q_vi
 
 if __name__ == "__main__":

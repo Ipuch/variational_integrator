@@ -9,7 +9,7 @@ import biorbd_casadi
 
 from casadi import MX, jacobian, Function
 
-from varint.minimal_variational_integrator import VariationalIntegrator, QuadratureRule
+from varint.minimal_variational_integrator import VariationalIntegrator
 
 from utils import *
 
@@ -52,7 +52,6 @@ def one_pendulum_force(time: float = 10, time_step: float = 0.05, unit_test: boo
         time=time,
         constraints=fcn_constraint,
         jac=fcn_jacobian,
-        discrete_approximation=QuadratureRule.TRAPEZOIDAL,
         controls=tau,
         q_init=np.concatenate((all_q_t0[:, np.newaxis], all_q_t1[:, np.newaxis]), axis=1),
     )

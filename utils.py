@@ -2,6 +2,7 @@ import numpy as np
 from pathlib import Path
 import copy
 import biorbd
+from varint.enums import QuadratureRule
 
 from enum import Enum
 
@@ -89,7 +90,7 @@ def total_energy(biorbd_model: biorbd.Model, q: np.ndarray, qdot: np.ndarray) ->
     return H
 
 
-def discrete_total_energy_i(biorbd_model: biorbd.Model, q1: np.ndarray, q2: np.ndarray, time_step) -> np.ndarray:
+def discrete_total_energy_i(biorbd_model: biorbd.Model, q1: np.ndarray, q2: np.ndarray, time_step, discrete_approximation) -> np.ndarray:
     """
     Compute the discrete total energy of a biorbd model
 
@@ -103,17 +104,37 @@ def discrete_total_energy_i(biorbd_model: biorbd.Model, q1: np.ndarray, q2: np.n
         The generalized coordinates at the second time step
     time_step: float
         The time step
+    discrete_approximation: QuadratureRule
+        The chosen discrete approximation for the energy computing, must be chosen equal to the approximation chosen
+        for the integration.
 
     Returns
     -------
     The discrete total energy
     """
-    q_middle = (q1 + q2) / 2
-    qdot_middle = (q2 - q1) / time_step
-    return total_energy_i(biorbd_model, np.array(q_middle), np.array(qdot_middle))
+    if discrete_approximation == QuadratureRule.MIDPOINT:
+        q = (q1 + q2) / 2
+    elif discrete_approximation == QuadratureRule.LEFT_APPROXIMATION:
+        q = q1
+    elif discrete_approximation == QuadratureRule.RIGHT_APPROXIMATION:
+        q = q2
+    elif discrete_approximation == QuadratureRule.TRAPEZOIDAL:
+        q = (q1 + q2) / 2
+    else:
+        raise NotImplementedError(
+            f"Discrete energy computation {discrete_approximation} is not implemented"
+        )
+    q = (q1 + q2) / 2
+    qdot = (q2 - q1) / time_step
+    return total_energy_i(biorbd_model, np.array(q), np.array(qdot))
 
 
-def discrete_total_energy(biorbd_model: biorbd.Model, q: np.ndarray, time_step) -> np.ndarray:
+def discrete_total_energy(
+    biorbd_model: biorbd.Model,
+    q: np.ndarray,
+    time_step: float,
+    discrete_approximation: QuadratureRule = QuadratureRule.TRAPEZOIDAL,
+) -> np.ndarray:
     """
     Compute the discrete total energy of a biorbd model
 
@@ -125,6 +146,9 @@ def discrete_total_energy(biorbd_model: biorbd.Model, q: np.ndarray, time_step) 
         The generalized coordinates
     time_step: float
         The time step
+    discrete_approximation: QuadratureRule
+        The chosen discrete approximation for the energy computing, must be chosen equal to the approximation chosen
+        for the integration, trapezoidal by default.
 
     Returns
     -------
@@ -133,7 +157,7 @@ def discrete_total_energy(biorbd_model: biorbd.Model, q: np.ndarray, time_step) 
     n_frames = q.shape[1]
     discrete_total_energy = np.zeros((n_frames - 1, 1))
     for i in range(n_frames - 1):
-        discrete_total_energy[i] = discrete_total_energy_i(biorbd_model, q[:, i], q[:, i + 1], time_step)
+        discrete_total_energy[i] = discrete_total_energy_i(biorbd_model, q[:, i], q[:, i + 1], time_step, discrete_approximation)
     return discrete_total_energy
 
 
