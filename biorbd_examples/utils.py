@@ -2,7 +2,7 @@ import numpy as np
 from pathlib import Path
 import copy
 import biorbd
-from varint.enums import QuadratureRule
+from varint import QuadratureRule
 
 from enum import Enum
 
@@ -14,12 +14,12 @@ class Models(Enum):
     The different models
     """
 
-    PENDULUM = str(UNIT_DATA / "biorbd_examples/models/pendulum.bioMod")
-    ONE_PENDULUM = str(UNIT_DATA / "biorbd_examples/models/one_pendulum.bioMod")
-    DOUBLE_PENDULUM = str(UNIT_DATA / "biorbd_examples/models/double_pendulum.bioMod")
-    TWO_PENDULUMS = str(UNIT_DATA / "biorbd_examples/models/two_pendulums.bioMod")
-    TRIPLE_PENDULUM = str(UNIT_DATA / "biorbd_examples/models/triple_pendulum.bioMod")
-    THREE_PENDULUMS = str(UNIT_DATA / "biorbd_examples/models/three_pendulums.bioMod")
+    PENDULUM = str(UNIT_DATA / "models/pendulum.bioMod")
+    ONE_PENDULUM = str(UNIT_DATA / "models/one_pendulum.bioMod")
+    DOUBLE_PENDULUM = str(UNIT_DATA / "models/double_pendulum.bioMod")
+    TWO_PENDULUMS = str(UNIT_DATA / "models/two_pendulums.bioMod")
+    TRIPLE_PENDULUM = str(UNIT_DATA / "models/triple_pendulum.bioMod")
+    THREE_PENDULUMS = str(UNIT_DATA / "models/three_pendulums.bioMod")
 
 
 def forward_dynamics(biorbd_model: biorbd.Model, q: np.ndarray, qdot: np.ndarray, tau: np.ndarray) -> np.ndarray:

@@ -5,10 +5,9 @@ This example is a simple pendulum controlled with a torque calculated by bioptim
 rad in 1 sec and 30 frames.
 """
 import biorbd_casadi
-from numpy import nan
 from varint.minimal_variational_integrator import VariationalIntegrator
 
-from utils import *
+from biorbd_examples.utils import *
 
 # `tau_optimal_control` and `q_optimal_control` where calculated with the example `pendulum.py` from `bioptim` with a
 # model with only one dof (Rotx), `final_time=1`, `n_shooting=30` and without preventing the model from actively rotate
@@ -20,7 +19,7 @@ tau_optimal_control = np.asarray([[
         11.88936988, 10.5316134,   9.13412692,   7.71755652,   6.29825044,
         4.88754928,  3.49156338,   2.1113697,    0.74351136,   -0.61932967,
         -1.98760312, -3.37419226,  -4.79380495,  -6.26248594,  -7.79726463,
-        -9.41594264, -11.13702162, -12.97977061, -14.96443099, -17.11254998, nan
+        -9.41594264, -11.13702162, -12.97977061, -14.96443099, -17.11254998
     ]])
 
 q_optimal_control = [
@@ -45,7 +44,7 @@ def pendulum(
     import time as t
 
     time = 1
-    time_step = 1/31
+    time_step = 1/30
 
     tic0 = t.time()
 

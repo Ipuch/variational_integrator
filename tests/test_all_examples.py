@@ -1,10 +1,27 @@
 import numpy as np
+import importlib.util
+from pathlib import Path
+
+
+def biorbd_examples_folder() -> str:
+    return str(Path(__file__).parent.parent / "biorbd_examples")
+
+
+def load_module(path: str):
+    module_name = path.split("/")[-1].split(".")[0]
+    spec = importlib.util.spec_from_file_location(
+        module_name,
+        path,
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_pendulum():
-    from biorbd_examples import pendulum
+    module = load_module(biorbd_examples_folder() + "/pendulum.py")
 
-    q_vi = pendulum.pendulum(time=600, time_step=0.01)
+    q_vi = module.pendulum(time=600, time_step=0.01)
 
     np.testing.assert_almost_equal(
         q_vi[:, -1],
@@ -14,9 +31,9 @@ def test_pendulum():
 
 
 def test_one_pendulum():
-    from biorbd_examples import one_pendulum
+    module = load_module(biorbd_examples_folder() + "/one_pendulum.py")
 
-    q_vi = one_pendulum.one_pendulum(time=10, time_step=0.05)
+    q_vi = module.one_pendulum(time=10, time_step=0.05)
 
     np.testing.assert_almost_equal(
         q_vi[:, -1],
@@ -26,9 +43,9 @@ def test_one_pendulum():
 
 
 def test_one_pendulum_force():
-    from biorbd_examples import one_pendulum_force
+    module = load_module(biorbd_examples_folder() + "/one_pendulum_force.py")
 
-    q_vi = one_pendulum_force.one_pendulum_force(time=10, time_step=0.05)
+    q_vi = module.one_pendulum_force(time=10, time_step=0.05)
 
     np.testing.assert_almost_equal(
         q_vi[:, -1],
@@ -38,21 +55,21 @@ def test_one_pendulum_force():
 
 
 def test_pendulum_control():
-    from biorbd_examples import pendulum_control
+    module = load_module(biorbd_examples_folder() + "/pendulum_control.py")
 
-    q_vi = pendulum_control.pendulum()
+    q_vi = module.pendulum()
 
     np.testing.assert_almost_equal(
         q_vi[:, -1],
-        [2.895386567812652],
+        [3.129467086425164],
         decimal=15,
     )
 
 
-def test_double_pendulum(time=60, time_step=0.05):
-    from biorbd_examples import douple_pendulum
+def test_double_pendulum():
+    module = load_module(biorbd_examples_folder() + "/double_pendulum.py")
 
-    q_vi = douple_pendulum.double_pendulum()
+    q_vi = module.double_pendulum(time=60, time_step=0.05)
 
     np.testing.assert_almost_equal(
         q_vi[:, -1],
@@ -61,10 +78,10 @@ def test_double_pendulum(time=60, time_step=0.05):
     )
 
 
-def test_two_pendulums(time=10, time_step=0.05):
-    from biorbd_examples import two_pendulums
+def test_two_pendulums():
+    module = load_module(biorbd_examples_folder() + "/two_pendulums.py")
 
-    q_vi = two_pendulums.two_pendulums()
+    q_vi = module.two_pendulums(time=10, time_step=0.05)
 
     np.testing.assert_almost_equal(
         q_vi[:, -1],
@@ -73,10 +90,10 @@ def test_two_pendulums(time=10, time_step=0.05):
     )
 
 
-def test_three_pendulums(time=20, time_step=0.05):
-    from biorbd_examples import three_pendulums
+def test_three_pendulums():
+    module = load_module(biorbd_examples_folder() + "/three_pendulums.py")
 
-    q_vi = three_pendulums.three_pendulums()
+    q_vi = module.three_pendulums(time=20, time_step=0.05)
 
     np.testing.assert_almost_equal(
         q_vi[:, -1],

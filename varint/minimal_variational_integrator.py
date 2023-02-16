@@ -46,6 +46,15 @@ class VariationalIntegrator:
         # force_approximation: QuadratureRule = QuadratureRule.TRAPEZOIDAL,
         newton_descent_tolerance: float = 1e-14,
     ):
+        # `check approximation` and `control_type`
+        if discrete_approximation not in QuadratureRule:
+            raise NotImplementedError(
+                f"Discrete {self.discrete_approximation} is not implemented"
+            )
+        if control_type not in ControlType:
+            raise NotImplementedError(
+                f"Control {self.discrete_approximation} is not implemented"
+            )
         # check q_init
         if q_init.shape[0] != biorbd_model.nbQ():
             raise RuntimeError("q_init must have the same number of rows as the number of degrees of freedom")
@@ -311,72 +320,43 @@ class VariationalIntegrator:
         D1_Ld_qcur_qnext = transpose(jacobian(self.discrete_lagrangian(q_cur, q_next), q_cur))
         constraint_term = transpose(self.jac(q_cur)) @ lambdas if self.constraints is not None else MX.zeros(p_current.shape)
 
-        return p_current + D1_Ld_qcur_qnext - constraint_term + self.control_approximation(control_prev, control_cur, control_next)
+        return p_current + D1_Ld_qcur_qnext - constraint_term + self.control_approximation(control_prev, control_cur) + self.control_approximation(control_cur, control_next)
 
     def control_approximation(
         self,
-        control_prev: MX | SX,
-        control_cur: MX | SX,
-        control_next: MX | SX,
+        control_minus: MX | SX,
+        control_plus: MX | SX,
     ):
         """
         Compute the term associated to the discrete forcing.
 
         Parameters
         ----------
-        control_prev: MX | SX
-            fc(t_{k-1})
-        control_cur: MX | SX
-            fc(t_k)
-        control_next: MX | SX
-            fc(t_{k+1})
-
+        control_minus: MX | SX
+            Control at t_k (or t{k-1})
+        control_plus: MX | SX
+            Control at t_{k+1} (or tk)
         Returns
         ----------
         The term associated to the controls in the Lagrangian equations.
-        The notations are the same as in Johnson, E. R., & Murphey, T. D. (2009).
+        Johnson, E. R., & Murphey, T. D. (2009).
         Scalable Variational Integrators for Constrained Mechanical Systems in Generalized Coordinates.
         IEEE Transactions on Robotics, 25(6), 1249–1261. doi:10.1109/tro.2009.2032955
         """
-        if self.control_type == ControlType.PIECEWISE_LINEAR:
+        if self.control_type == ControlType.PIECEWISE_CONSTANT:
+            return 1 / 2 * control_minus * self.time_step
+
+        elif self.control_type == ControlType.PIECEWISE_LINEAR:
             if self.discrete_approximation == QuadratureRule.MIDPOINT:
-                fd_plus = 1 / 2 * (control_prev + control_cur) / 2 * self.time_step
-                fd_minus = 1 / 2 * (control_cur + control_next) / 2 * self.time_step
+                return 1 / 2 * (control_minus + control_plus) / 2 * self.time_step
             elif self.discrete_approximation == QuadratureRule.LEFT_APPROXIMATION:
-                fd_plus = 1 / 2 * control_prev * self.time_step
-                fd_minus = 1 / 2 * control_cur * self.time_step
+                return 1 / 2 * control_minus * self.time_step
             elif self.discrete_approximation == QuadratureRule.RIGHT_APPROXIMATION:
-                fd_plus = 1 / 2 * control_cur * self.time_step
-                fd_minus = 1 / 2 * control_next * self.time_step
+                return 1 / 2 * control_plus * self.time_step
             elif self.discrete_approximation == QuadratureRule.TRAPEZOIDAL:
                 raise NotImplementedError(
                     f"Discrete {self.discrete_approximation} is not implemented for {self.control_type}"
                 )
-            else:
-                raise NotImplementedError(
-                    f"Discrete {self.discrete_approximation} is not implemented"
-                )
-
-        elif self.control_type == ControlType.PIECEWISE_CONSTANT:
-            if self.discrete_approximation == QuadratureRule.MIDPOINT or self.discrete_approximation == QuadratureRule.TRAPEZOIDAL:
-                fd_plus = 1 / 2 * control_prev * self.time_step
-                fd_minus = 1 / 2 * control_cur * self.time_step
-            elif self.discrete_approximation == QuadratureRule.LEFT_APPROXIMATION:
-                fd_plus = 1 / 2 * control_prev * self.time_step
-                fd_minus = 1 / 2 * control_prev * self.time_step
-            elif self.discrete_approximation == QuadratureRule.RIGHT_APPROXIMATION:
-                fd_plus = 1 / 2 * control_cur * self.time_step
-                fd_minus = 1 / 2 * control_cur * self.time_step
-            else:
-                raise NotImplementedError(
-                    f"Discrete {self.discrete_approximation} is not implemented"
-                )
-        else:
-            raise NotImplementedError(
-                f"{self.control_type} is not implemented"
-            )
-
-        return fd_minus + fd_plus
 
     def integrate(self):
         """
@@ -384,9 +364,6 @@ class VariationalIntegrator:
         """
         q_prev = self.q1_num
         q_cur = self.q2_num
-
-        u_prev = self.controls[:, 0]
-        u_cur = self.controls[:, 1]
 
         # initialize the outputs of the integrator
         q_all = np.zeros((self.biorbd_model.nbQ(), self.nb_steps))

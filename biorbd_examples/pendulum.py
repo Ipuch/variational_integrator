@@ -7,7 +7,7 @@ import biorbd_casadi
 
 from varint.minimal_variational_integrator import VariationalIntegrator
 
-from utils import *
+from biorbd_examples.utils import *
 
 
 def pendulum(time: float = 600, time_step: float = 0.01, unit_test: bool = False):

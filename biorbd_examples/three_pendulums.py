@@ -10,7 +10,7 @@ from casadi import MX, jacobian, Function, vertcat
 
 from varint.minimal_variational_integrator import VariationalIntegrator
 
-from utils import *
+from biorbd_examples.utils import *
 
 
 def three_pendulums(time: float = 20, time_step: float = 0.05, unit_test = False):
