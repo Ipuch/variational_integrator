@@ -22,3 +22,11 @@ class VariationalIntegratorType(Enum):
     FORCED_DISCRETE_EULER_LAGRANGE = "forced_discrete_euler_lagrange"
     FORCED_CONSTRAINED_DISCRETE_EULER_LAGRANGE = "forced_constrained_discrete_euler_lagrange"
 
+
+class ControlType(Enum):
+    """
+    The different control types
+    """
+
+    PIECEWISE_CONSTANT = "piecewise_constant"
+    PIECEWISE_LINEAR = "piecewise_linear"

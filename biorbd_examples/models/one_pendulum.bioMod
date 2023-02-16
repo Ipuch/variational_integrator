@@ -1,6 +1,6 @@
 version 4
 
-segment Seg1
+segment Seg0
     translations	yz
     rotations	x
     ranges
@@ -16,14 +16,20 @@ segment Seg1
     meshfile mesh/pendulum.STL
 endsegment
 
-    // Marker 1
-    marker marker_1
-        parent Seg1
+    // Marker 0
+    marker marker_0
+        parent Seg0
         position 0 0 0
     endmarker
 
+    // Marker 1
+    marker marker_1
+        parent Seg0
+        position 0 0 -1
+    endmarker
+
     // Marker 2
-    marker marker_2
-        parent Seg1
+    marker CoM0
+        parent Seg0
         position -0.0005 0.0688 -0.9542
     endmarker
