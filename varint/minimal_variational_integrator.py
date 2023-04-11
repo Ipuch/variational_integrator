@@ -37,6 +37,7 @@ class VariationalIntegrator:
         time_step: float,
         time: float,
         q_init: np.ndarray,
+        q_dot_init: np.ndarray = None,
         constraints: Function = None,
         jac: Function = None,
         discrete_approximation: QuadratureRule = QuadratureRule.TRAPEZOIDAL,
@@ -55,14 +56,6 @@ class VariationalIntegrator:
             raise NotImplementedError(
                 f"Control {self.discrete_approximation} is not implemented"
             )
-        # check q_init
-        if q_init.shape[0] != biorbd_model.nbQ():
-            raise RuntimeError("q_init must have the same number of rows as the number of degrees of freedom")
-        if q_init.shape[1] != 2:
-            raise RuntimeError("q_init must have two columns, one q0 and one q1")
-        self.q_init = q_init
-        self.q1_num = q_init[:, 0]
-        self.q2_num = q_init[:, 1]
 
         self.biorbd_model = biorbd_model
         self.time_step = time_step
@@ -106,6 +99,58 @@ class VariationalIntegrator:
         self._declare_mx()
         self._declare_discrete_euler_lagrange_equations()
         self.newton_descent_tolerance = newton_descent_tolerance
+
+        # check q_init
+        if q_dot_init is not None:
+            if q_init.shape[0] != biorbd_model.nbQ():
+                raise RuntimeError("q_init must have the same number of rows as the number of degrees of freedom")
+            if q_dot_init.shape[0] != biorbd_model.nbQ():
+                raise RuntimeError("q_dot_init must have the same number of rows as the number of degrees of freedom")
+            if q_init.shape[1] != 1:
+                raise RuntimeError("If an initial velocity is given (q_dot_init), q_init must have one columns (q0)")
+            if q_dot_init.shape[1] != 1:
+                raise RuntimeError("q_dot_init must have one columns (q0_dot)")
+            self.q_init = self._compute_initial_states(q_init, q_dot_init)
+        else:
+            if q_init.shape[0] != biorbd_model.nbQ():
+                raise RuntimeError("q_init must have the same number of rows as the number of degrees of freedom")
+            if q_init.shape[1] != 2:
+                raise RuntimeError("q_init must have two columns, one q0 and one q1")
+            self.q_init = q_init
+
+        self.q1_num = self.q_init[:, 0]
+        self.q2_num = self.q_init[:, 1]
+
+    def _compute_initial_states(self, q_init, q_dot_init):
+        # Declare the MX variables
+        q0 = MX.sym("q0", self.biorbd_model.nbQ(), 1)
+        q0_dot = MX.sym("q0_dot", self.biorbd_model.nbQ(), 1)
+        q1 = MX.sym("q1", self.biorbd_model.nbQ(), 1)
+        f0_minus = MX.sym("f0_minus", self.biorbd_model.nbQ(), 1)
+
+        # Equation (3.15c) in the paper Discrete Mechanics and Optimal Control: an Analysis
+        # (https://arxiv.org/pdf/0810.1386.pdf)
+        D2_L_q0_q0dot = transpose(jacobian(self.lagrangian(q0, q0_dot), q0_dot))
+        D1_Ld_q0_q1 = transpose(jacobian(self.discrete_lagrangian(q0, q1), q0))
+        output = [D2_L_q0_q0dot + D1_Ld_q0_q1 + f0_minus]
+
+        initial_states_fun = Function("initial_states", [q0, q0_dot, q1, f0_minus], output).expand()
+
+        mx_residuals = initial_states_fun(q_init[:, 0], q_dot_init[:, 0], q1, self.controls[:, 0])
+        decision_variables = q1
+
+        residuals = Function(
+            "initial_states_residuals",
+            [decision_variables],
+            [mx_residuals],
+        ).expand()
+
+        # Create a implicit function instance to solve the system of equations
+        opts = {}
+        opts["abstol"] = self.newton_descent_tolerance
+        ifcn = rootfinder("ifcn", "newton", residuals, opts)
+
+        return np.concatenate((q_init, ifcn(q_init[:, 0] + q_dot_init[:, 0] * self.time_step).toarray()), axis=1)
 
     def _declare_mx(self):
         """
