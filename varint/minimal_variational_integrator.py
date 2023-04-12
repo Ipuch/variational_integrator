@@ -132,12 +132,22 @@ class VariationalIntegrator:
         # (https://arxiv.org/pdf/0810.1386.pdf)
         D2_L_q0_q0dot = transpose(jacobian(self.lagrangian(q0, q0_dot), q0_dot))
         D1_Ld_q0_q1 = transpose(jacobian(self.discrete_lagrangian(q0, q1), q0))
-        output = [D2_L_q0_q0dot + D1_Ld_q0_q1 + f0_minus]
+        # The constraint term is added as in _discrete_euler_lagrange_equations
+        constraint_term = transpose(self.jac(q0)) @ self.lambdas if self.constraints is not None else MX.zeros(
+            self.biorbd_model.nbQ(), 1)
+        output = [D2_L_q0_q0dot + D1_Ld_q0_q1 + f0_minus - constraint_term]
 
-        initial_states_fun = Function("initial_states", [q0, q0_dot, q1, f0_minus], output).expand()
+        initial_states_fun = Function("initial_states", [q0, q0_dot, q1, f0_minus, self.lambdas], output).expand()
 
-        mx_residuals = initial_states_fun(q_init[:, 0], q_dot_init[:, 0], q1, self.controls[:, 0])
+        mx_residuals = initial_states_fun(q_init[:, 0], q_dot_init[:, 0], q1, self.controls[:, 0], self.lambdas)
         decision_variables = q1
+
+        if (
+            self.variational_integrator_type == VariationalIntegratorType.CONSTRAINED_DISCRETE_EULER_LAGRANGE
+            or self.variational_integrator_type == VariationalIntegratorType.FORCED_CONSTRAINED_DISCRETE_EULER_LAGRANGE
+        ):
+            decision_variables = vertcat(decision_variables, self.lambdas)
+            mx_residuals = vertcat(mx_residuals, self.constraints(q1))
 
         residuals = Function(
             "initial_states_residuals",
@@ -150,7 +160,18 @@ class VariationalIntegrator:
         opts["abstol"] = self.newton_descent_tolerance
         ifcn = rootfinder("ifcn", "newton", residuals, opts)
 
-        return np.concatenate((q_init, ifcn(q_init[:, 0] + q_dot_init[:, 0] * self.time_step).toarray()), axis=1)
+        if self.constraints is not None:
+            lambdas_all = np.zeros((self.constraints.nnz_out(), self.nb_steps))
+            lambdas_num = lambdas_all[:, 0]
+        else:
+            lambdas_num = np.zeros((0, self.nb_steps))
+
+        # q_cur as an initial guess
+        v_init = self._dispatch_to_v(q_init[:, 0] + q_dot_init[:, 0] * self.time_step, lambdas_num)
+        v_opt = ifcn(v_init)
+        qdot_opt, _ = self._dispatch_to_q_lambdas(v_opt)
+
+        return np.concatenate((q_init, qdot_opt), axis=1)
 
     def _declare_mx(self):
         """
