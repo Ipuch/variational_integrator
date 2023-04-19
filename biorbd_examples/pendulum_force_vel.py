@@ -45,7 +45,7 @@ def one_pendulum_force(time: float = 10, time_step: float = 0.05, unit_test: boo
         q_init=q_t0[:, np.newaxis],
         q_dot_init=np.array([[0.0]]),
     )
-    q_vi_vel, lambdas_vi_vel = vi_vel.integrate()
+    q_vi_vel, lambdas_vi_vel, _ = vi_vel.integrate()
 
     if unit_test:
         import matplotlib.pyplot as plt

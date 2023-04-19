@@ -71,7 +71,7 @@ def three_pendulums(time: float = 20, time_step: float = 0.05, unit_test = False
         q_dot_init=np.zeros((biorbd_casadi_model.nbQ(), 1)),
     )
 
-    q_vi_vel, lambdas_vi_vel = vi_vel.integrate()
+    q_vi_vel, lambdas_vi_vel, _ = vi_vel.integrate()
 
     if unit_test:
         import bioviz

@@ -45,10 +45,23 @@ def double_pendulum(time: float = 60, time_step: float = 0.05, unit_test: bool =
         discrete_approximation=QuadratureRule.MIDPOINT,
     )
     # vi.set_initial_values(q_prev=1.54, q_cur=1.545)
-    q_vi, _ = vi.integrate()
+    q_vi, _, qdot_final = vi.integrate()
 
     tic2 = t.time()
     print(tic2 - tic1)
+
+    print(f"Final velocity with variational integrator (two initial states):"
+          f" {qdot_final}, "
+          f"with {multistep_integrator}: {q_rk45[2:, -1]}, "
+          f"with RK4: {q_rk4[2:, -1]}")
+
+    print(f"({multistep_integrator}) Final velocity calculated with the variational integrator function: "
+          f"{vi.compute_final_velocity(q_rk45[:2, -2], q_rk45[:2, -1])}, "
+          f"VS the one calculated with {multistep_integrator} {q_rk45[2:, -1]}")
+
+    print(f"(RK4) Final velocity calculated with the variational integrator function: "
+          f"{vi.compute_final_velocity(q_rk4[:2, -2], q_rk4[:2, -1])}, "
+          f"VS the one calculated with RK4 {q_rk4[2:, -1]}")
 
     if unit_test:
         import bioviz

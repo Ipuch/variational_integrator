@@ -57,7 +57,7 @@ def pendulum(
         controls=tau_optimal_control,
     )
 
-    q_vi, _ = vi.integrate()
+    q_vi, *_ = vi.integrate()
 
     print(q_vi)
 

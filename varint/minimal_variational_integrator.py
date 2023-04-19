@@ -173,6 +173,40 @@ class VariationalIntegrator:
 
         return np.concatenate((q_init, qdot_opt), axis=1)
 
+    def compute_final_velocity(self, q_penultimate, q_ultimate):
+        # Declare the MX variables
+        qN = MX.sym("qN", self.biorbd_model.nbQ(), 1)
+        qN_dot = MX.sym("qN_dot", self.biorbd_model.nbQ(), 1)
+        qN_minus_1 = MX.sym("qN_minus_1", self.biorbd_model.nbQ(), 1)
+        fd_plus = MX.sym("fd_plus", self.biorbd_model.nbQ(), 1)
+
+        # Equation (3.14) in the paper Discrete Mechanics and Optimal Control: an Analysis
+        # (https://arxiv.org/pdf/0810.1386.pdf)
+        D2_L_qT_qT_dot = transpose(jacobian(self.lagrangian(qN, qN_dot), qN_dot))
+        D2_Ld_qN_minus_1_qN = transpose(jacobian(self.discrete_lagrangian(qN_minus_1, qN), qN))
+        # The constraint term is added as in _discrete_euler_lagrange_equations
+        output = [- D2_L_qT_qT_dot + D2_Ld_qN_minus_1_qN + fd_plus]
+
+        initial_states_fun = Function("initial_states", [qN, qN_dot, qN_minus_1, fd_plus], output).expand()
+
+        mx_residuals = initial_states_fun(q_ultimate, qN_dot, q_penultimate, self.controls[:, -1])
+        decision_variables = qN_dot
+
+        residuals = Function(
+            "final_states_residuals",
+            [decision_variables],
+            [mx_residuals],
+        ).expand()
+
+        # Create a implicit function instance to solve the system of equations
+        opts = {"abstol": self.newton_descent_tolerance}
+        ifcn = rootfinder("ifcn", "newton", residuals, opts)
+
+        # q_cur as an initial guess
+        qN_dot = ifcn((q_penultimate + q_ultimate) / self.time_step)
+
+        return qN_dot
+
     def _declare_mx(self):
         """
         Declare the MX variables
@@ -470,7 +504,9 @@ class VariationalIntegrator:
                 lambdas_all[:, i] = lambdas_num.toarray().squeeze()
             q_all[:, i] = q_next.toarray().squeeze()
 
-        return q_all, lambdas_all
+        q_dot_final = self.compute_final_velocity(q_all[:, -2], q_all[:, -1])
+
+        return q_all, lambdas_all, q_dot_final
 
     def _dispatch_to_v(self, q: np.ndarray, lambdas: np.ndarray) -> np.ndarray:
         """

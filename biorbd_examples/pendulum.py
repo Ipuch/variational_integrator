@@ -43,7 +43,7 @@ def pendulum(time: float = 600, time_step: float = 0.01, unit_test: bool = False
         q_init=np.array([[1.54, 1.54]]),
     )
     # vi.set_initial_values(q_prev=q_rk45[0, 0], q_cur=q_rk45[0, 1])
-    q_vi, _ = vi.integrate()
+    q_vi, *_ = vi.integrate()
 
     tic2 = t.time()
     print(tic2 - tic1)

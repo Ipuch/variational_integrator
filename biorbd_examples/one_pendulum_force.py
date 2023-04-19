@@ -55,7 +55,7 @@ def one_pendulum_force(time: float = 10, time_step: float = 0.05, unit_test: boo
         controls=tau,
         q_init=np.concatenate((all_q_t0[:, np.newaxis], all_q_t1[:, np.newaxis]), axis=1),
     )
-    q_vi, lambdas_vi = vi.integrate()
+    q_vi, lambdas_vi, _ = vi.integrate()
 
     tic2 = t.time()
     print(tic2 - tic0)

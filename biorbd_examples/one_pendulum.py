@@ -46,7 +46,7 @@ def one_pendulum(time: float = 10, time_step: float = 0.05, unit_test: bool = Fa
         q_init=np.concatenate((all_q_t0[:, np.newaxis], all_q_t1[:, np.newaxis]), axis=1),
     )
     # vi.set_initial_values(q_prev=1.54, q_cur=1.545)
-    q_vi, lambdas_vi = vi.integrate()
+    q_vi, lambdas_vi, _ = vi.integrate()
 
     tic2 = t.time()
     print(tic2 - tic0)

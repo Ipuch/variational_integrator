@@ -52,7 +52,12 @@ def pendulum(time: float = 10, time_step: float = 0.01, unit_test: bool = False)
         q_init=np.array([[1.54, 1.54]]),
     )
     # vi.set_initial_values(q_prev=q_rk45[0, 0], q_cur=q_rk45[0, 1])
-    q_vi, _ = vi.integrate()
+    q_vi, _, qdot_final = vi.integrate()
+
+    print(f"Final velocity with variational integrator (initial velocity): {qdot_final}, "
+          f"with variational integrator (two initial states): {vi.compute_final_velocity(q_vi[:, -2], q_vi[:, -1])}, "
+          f"with {multistep_integrator}: {q_rk45[1, -1]}, "
+          f"with RK4: {q_rk4[1, -1]}")
 
     if unit_test:
         import matplotlib.pyplot as plt
