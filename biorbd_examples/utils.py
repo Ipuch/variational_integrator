@@ -124,7 +124,6 @@ def discrete_total_energy_i(biorbd_model: biorbd.Model, q1: np.ndarray, q2: np.n
         raise NotImplementedError(
             f"Discrete energy computation {discrete_approximation} is not implemented"
         )
-    q = (q1 + q2) / 2
     qdot = (q2 - q1) / time_step
     return total_energy_i(biorbd_model, np.array(q), np.array(qdot))
 
