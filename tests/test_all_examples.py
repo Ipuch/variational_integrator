@@ -49,7 +49,7 @@ def test_one_pendulum_force():
 
     np.testing.assert_almost_equal(
         q_vi[:, -1],
-        [0.0, 0.0, 1001.856438367177134],
+        [0.0, 0.0, 0.021828346851540],
         decimal=15,
     )
 

@@ -41,7 +41,7 @@ def one_pendulum_force(time: float = 10, time_step: float = 0.05, unit_test: boo
     print(fcn_constraint(all_q_t0))
 
     # controls
-    torque = 20
+    torque = 1
     tau = np.zeros((biorbd_model.nbGeneralizedTorque(), nb_frames))
     tau[-1, :] = torque
 
