@@ -12,23 +12,6 @@ from .enums import QuadratureRule, VariationalIntegratorType, ControlType
 class VariationalIntegrator:
     """
     This class to build a variational integrator based on the discrete Lagrangian and a first order quadrature method.
-
-    Attributes
-    ----------
-    biorbd_model: biorbd_casadi.Model
-        The biorbd model
-    time_step: float
-        The time step of the integration
-    time: float
-        The time of the integration
-    constraints: Callable
-        The constraints of the system only one callable for now
-    jac: Callable
-        The jacobian of the constraints of the system only one callable for now
-    forces: Callable
-        The forces of the system only one callable for now, it needs to be a function of q, qdot
-    controls: np.ndarray
-        The controls of the system, it needs to be the size of the number of degrees of freedom
     """
 
     def __init__(
@@ -47,6 +30,38 @@ class VariationalIntegrator:
         # force_approximation: QuadratureRule = QuadratureRule.TRAPEZOIDAL,
         newton_descent_tolerance: float = 1e-14,
     ):
+        """
+        Parameters
+        ----------
+        biorbd_model: biorbd_casadi.Model
+            The biorbd model.
+        time_step: float
+            The time step of the integration.
+        time: float
+            The duration of the integration.
+        q_init: np.ndarray
+            The initial position of the system. q_init must have the same number of rows as the number of degrees of
+            freedom. It can have two columns if you want to specify the two first positions of the system, in this case
+            you can't specify q_dot_init. If you want to specify the initial position and the initial velocity, you need
+            to specify q_init with only one column and q_dot_init.
+        q_dot_init: np.ndarray
+            The initial velocity of the system. q_dot_init must have the same number of rows as the number of degrees of
+            freedom. It needs to have only one column and q_init needs to have only one column too.
+        constraints: Callable
+            The constraints of the system only one callable for now
+        jac: Callable
+            The jacobian of the constraints of the system only one callable for now
+        discrete_approximation: QuadratureRule
+            The quadrature rule used to approximate the discrete Lagrangian.
+        controls: np.ndarray
+            The controls of the system, it needs to be the size of the number of degrees of freedom.
+        control_type: ControlType
+            The type of control used.
+        forces: Callable
+            The forces of the system only one callable for now, it needs to be a function of q, qdot
+        newton_descent_tolerance: float
+            The tolerance of the newton descent method.
+        """
         # `check approximation` and `control_type`
         if discrete_approximation not in QuadratureRule:
             raise NotImplementedError(
@@ -103,23 +118,21 @@ class VariationalIntegrator:
         # check q_init
         if q_dot_init is not None:
             if q_init.shape[0] != biorbd_model.nbQ():
-                raise RuntimeError("q_init must have the same number of rows as the number of degrees of freedom")
+                raise ValueError("q_init must have the same number of rows as the number of degrees of freedom")
             if q_dot_init.shape[0] != biorbd_model.nbQ():
-                raise RuntimeError("q_dot_init must have the same number of rows as the number of degrees of freedom")
+                raise ValueError("q_dot_init must have the same number of rows as the number of degrees of freedom")
             if q_init.shape[1] != 1:
-                raise RuntimeError("If an initial velocity is given (q_dot_init), q_init must have one columns (q0)")
+                raise ValueError("If an initial velocity is given (q_dot_init), q_init must have one columns (q0)")
             if q_dot_init.shape[1] != 1:
-                raise RuntimeError("q_dot_init must have one columns (q0_dot)")
-            self.q_init = self._compute_initial_states(q_init, q_dot_init)
+                raise ValueError("q_dot_init must have one columns (q0_dot)")
+            self.q1_num, self.q2_num = self._compute_initial_states(q_init, q_dot_init)
         else:
             if q_init.shape[0] != biorbd_model.nbQ():
-                raise RuntimeError("q_init must have the same number of rows as the number of degrees of freedom")
+                raise ValueError("q_init must have the same number of rows as the number of degrees of freedom")
             if q_init.shape[1] != 2:
-                raise RuntimeError("q_init must have two columns, one q0 and one q1")
-            self.q_init = q_init
-
-        self.q1_num = self.q_init[:, 0]
-        self.q2_num = self.q_init[:, 1]
+                raise ValueError("q_init must have two columns, one q0 and one q1")
+            self.q1_num = q_init[:, 0]
+            self.q2_num = q_init[:, 1]
 
     def _compute_initial_states(self, q_init, q_dot_init):
         # Declare the MX variables
@@ -166,12 +179,11 @@ class VariationalIntegrator:
         else:
             lambdas_num = np.zeros((0, self.nb_steps))
 
-        # q_cur as an initial guess
         v_init = self._dispatch_to_v(q_init[:, 0] + q_dot_init[:, 0] * self.time_step, lambdas_num)
         v_opt = ifcn(v_init)
-        qdot_opt, _ = self._dispatch_to_q_lambdas(v_opt)
+        q1_opt, _ = self._dispatch_to_q_lambdas(v_opt)
 
-        return np.concatenate((q_init, qdot_opt), axis=1)
+        return q_init, q1_opt
 
     def compute_final_velocity(self, q_penultimate, q_ultimate):
         # Declare the MX variables
@@ -182,12 +194,12 @@ class VariationalIntegrator:
 
         # Equation (3.14) in the paper Discrete Mechanics and Optimal Control: an Analysis
         # (https://arxiv.org/pdf/0810.1386.pdf)
-        D2_L_qT_qT_dot = transpose(jacobian(self.lagrangian(qN, qN_dot), qN_dot))
+        D2_L_qN_qN_dot = transpose(jacobian(self.lagrangian(qN, qN_dot), qN_dot))
         D2_Ld_qN_minus_1_qN = transpose(jacobian(self.discrete_lagrangian(qN_minus_1, qN), qN))
         # The constraint term is added as in _discrete_euler_lagrange_equations
-        output = [- D2_L_qT_qT_dot + D2_Ld_qN_minus_1_qN + fd_plus]
+        output = [- D2_L_qN_qN_dot + D2_Ld_qN_minus_1_qN + fd_plus]
 
-        initial_states_fun = Function("initial_states", [qN, qN_dot, qN_minus_1, fd_plus], output).expand()
+        initial_states_fun = Function("terminal_velocity", [qN, qN_dot, qN_minus_1, fd_plus], output).expand()
 
         mx_residuals = initial_states_fun(q_ultimate, qN_dot, q_penultimate, self.controls[:, -1])
         decision_variables = qN_dot
@@ -202,8 +214,7 @@ class VariationalIntegrator:
         opts = {"abstol": self.newton_descent_tolerance}
         ifcn = rootfinder("ifcn", "newton", residuals, opts)
 
-        # q_cur as an initial guess
-        qN_dot = ifcn((q_penultimate + q_ultimate) / self.time_step)
+        qN_dot = ifcn((q_ultimate - q_penultimate) / self.time_step)
 
         return qN_dot
 
