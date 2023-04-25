@@ -13,29 +13,17 @@ from varint.minimal_variational_integrator import VariationalIntegrator
 from biorbd_examples.utils import *
 
 
-def three_pendulums(time: float = 20, time_step: float = 0.05, unit_test = False):
+def three_pendulums(time: float = 20, time_step: float = 0.05, unit_test=False):
     biorbd_casadi_model = biorbd_casadi.Model(Models.THREE_PENDULUMS.value)
-    biorbd_model = biorbd.Model(Models.THREE_PENDULUMS.value)
-
-    import time as t
-
-    tic0 = t.time()
 
     # Rotations at t0
     q_t0 = np.array([1.54, 1.54, 1.54])
     # Translations between Seg0 and Seg1 at t0, calculated with cos and sin as Seg1 has no parent
     t1_t0 = np.array([np.sin(q_t0[0]), -np.cos(q_t0[0])])
     # Translations between Seg1 and Seg2 at t0, calculated with cos and sin as Seg2 has no parent
-    t2_t0 = np.array([2 * np.sin(q_t0[1]), - 2 * np.cos(q_t0[1])])
-    # Rotations at t1
-    q_t1 = np.array([1.545, 1.545, 1.545])
-    # Translations between Seg0 and Seg1 at t1, calculated with cos and sin as Seg1 has no parent
-    t1_t1 = np.array([np.sin(q_t1[0]), -np.cos(q_t1[0])])
-    # Translations between Seg1 and Seg2 at t1, calculated with cos and sin as Seg2 has no parent
-    t2_t1 = np.array([2 * np.sin(q_t1[1]), - 2 * np.cos(q_t1[1])])
+    t2_t0 = np.array([2 * np.sin(q_t0[1]), -2 * np.cos(q_t0[1])])
 
     all_q_t0 = np.array([q_t0[0], t1_t0[0], t1_t0[1], q_t0[1], t2_t0[0], t2_t0[1], q_t0[2]])
-    all_q_t1 = np.array([q_t1[0], t1_t1[0], t1_t1[1], q_t1[1], t2_t1[0], t2_t1[1], q_t1[2]])
 
     # Build  constraints
     q_sym = MX.sym("q", (biorbd_casadi_model.nbQ(), 1))
@@ -61,13 +49,11 @@ def three_pendulums(time: float = 20, time_step: float = 0.05, unit_test = False
         time=time,
         constraints=fcn_constraint,
         jac=fcn_jacobian,
-        q_init=np.concatenate((all_q_t0[:, np.newaxis], all_q_t1[:, np.newaxis]), axis=1),
+        q_init=all_q_t0[:, np.newaxis],
+        q_dot_init=np.zeros((biorbd_casadi_model.nbQ(), 1)),
     )
 
-    q_vi, lambdas_vi = vi.integrate()
-
-    tic2 = t.time()
-    print(tic2 - tic0)
+    q_vi, lambdas_vi, q_vi_dot = vi.integrate()
 
     if unit_test:
         import bioviz
@@ -79,38 +65,35 @@ def three_pendulums(time: float = 20, time_step: float = 0.05, unit_test = False
         import matplotlib.pyplot as plt
 
         fig, axs = plt.subplots(6, 2)
-        axs[0, 0].plot(
-            np.arange(0, time, time_step), q_vi[0, :], label="Variational Integrator", color="red", linestyle="-"
-        )
-        axs[0, 1].plot(
-            np.arange(0, time, time_step), q_vi[1, :], label="Variational Integrator", color="red", linestyle="-"
-        )
-        axs[1, 0].plot(
-            np.arange(0, time, time_step), q_vi[2, :], label="Variational Integrator", color="red", linestyle="-"
-        )
-        axs[1, 1].plot(
-            np.arange(0, time, time_step), q_vi[3, :], label="Variational Integrator", color="red", linestyle="-"
-        )
-        axs[2, 0].plot(
-            np.arange(0, time, time_step), q_vi[4, :], label="Variational Integrator", color="red", linestyle="-"
-        )
-        axs[2, 1].plot(
-            np.arange(0, time, time_step), q_vi[5, :], label="Variational Integrator", color="red", linestyle="-"
-        )
+        for i in range(3):
+            for j in range(2):
+                axs[i, j].plot(
+                    np.arange(0, time, time_step),
+                    q_vi[2 * i + j, :],
+                    label="Variational Integrator with initial state and velocity",
+                )
         axs[3, 0].plot(
-            np.arange(0, time, time_step), q_vi[6, :], label="Variational Integrator", color="red", linestyle="-"
+            np.arange(0, time, time_step), q_vi[6, :], label="Variational Integrator with initial state and velocity"
         )
         axs[3, 1].plot(
-            np.arange(0, time, time_step), lambdas_vi[0, :], label="Variational Integrator", color="red", linestyle="-"
+            np.arange(0, time, time_step),
+            lambdas_vi[0, :],
+            label="Variational Integrator with initial state and velocity",
         )
         axs[4, 0].plot(
-            np.arange(0, time, time_step), lambdas_vi[1, :], label="Variational Integrator", color="red", linestyle="-"
+            np.arange(0, time, time_step),
+            lambdas_vi[1, :],
+            label="Variational Integrator with initial state and velocity",
         )
         axs[4, 1].plot(
-            np.arange(0, time, time_step), lambdas_vi[2, :], label="Variational Integrator", color="red", linestyle="-"
+            np.arange(0, time, time_step),
+            lambdas_vi[2, :],
+            label="Variational Integrator with initial state and velocity",
         )
         axs[5, 0].plot(
-            np.arange(0, time, time_step), lambdas_vi[3, :], label="Variational Integrator", color="red", linestyle="-"
+            np.arange(0, time, time_step),
+            lambdas_vi[3, :],
+            label="Variational Integrator with initial state and velocity",
         )
 
         axs[0, 0].set_title("q0")
@@ -125,10 +108,7 @@ def three_pendulums(time: float = 20, time_step: float = 0.05, unit_test = False
         axs[4, 1].set_title("lambda2")
         axs[5, 0].set_title("lambda3")
 
-        # Plot total energy
-        plt.figure()
-        plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step), color="red")
-        plt.title("Total energy with variational integrator")
+        axs[0, 0].legend()
 
         # Verify the constraint respect
         plt.figure()
@@ -141,7 +121,11 @@ def three_pendulums(time: float = 20, time_step: float = 0.05, unit_test = False
 
         plt.show()
 
-    return q_vi
+        np.set_printoptions(formatter={"float": lambda x: "{0:0.15f}".format(x)})
+        print(q_vi[:, -1], q_vi_dot)
+
+    return q_vi, q_vi_dot
+
 
 if __name__ == "__main__":
     three_pendulums(unit_test=True)

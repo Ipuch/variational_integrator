@@ -16,15 +16,16 @@ def pendulum(time: float = 600, time_step: float = 0.01, unit_test: bool = False
 
     import time as t
 
-    multistep_integrator = "DOP853"  # DOP853
+    multistep_integrator = "DOP853"
 
     tic0 = t.time()
     # dop853 integrator
     from scipy.integrate import solve_ivp
 
-    q0 = np.array([1.54, 1.54])
-    qdot0 = (q0[1] - q0[0]) / time_step
-    x0 = np.hstack((q0[0], qdot0))
+    q0 = 1.54
+    qdot0 = 0.0
+
+    x0 = np.hstack((q0, qdot0))
     fd = lambda t, x: forward_dynamics(biorbd_model, np.array([x[0]]), np.array([x[1]]), np.array([0]))
     q_rk45 = solve_ivp(fd, [0, time], x0, method=multistep_integrator, t_eval=np.arange(0, time, time_step)).y
     from ode_solvers import RK4
@@ -40,10 +41,11 @@ def pendulum(time: float = 600, time_step: float = 0.01, unit_test: bool = False
         biorbd_model=biorbd_casadi_model,
         time_step=time_step,
         time=time,
-        q_init=np.array([[1.54, 1.54]]),
+        q_init=np.array([[q0]]),
+        q_dot_init=np.array([[0.0]]),
     )
     # vi.set_initial_values(q_prev=q_rk45[0, 0], q_cur=q_rk45[0, 1])
-    q_vi, _ = vi.integrate()
+    q_vi, _, q_vi_dot = vi.integrate()
 
     tic2 = t.time()
     print(tic2 - tic1)
@@ -68,7 +70,10 @@ def pendulum(time: float = 600, time_step: float = 0.01, unit_test: bool = False
 
         plt.show()
 
-    return q_vi
+        np.set_printoptions(formatter={"float": lambda x: "{0:0.15f}".format(x)})
+        print(q_vi[:, -1], q_vi_dot)
+
+    return q_vi, q_vi_dot
 
 
 if __name__ == "__main__":
