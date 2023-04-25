@@ -25,13 +25,8 @@ def two_pendulums(time: float = 10, time_step: float = 0.05, unit_test: bool = F
     q_t0 = np.array([1.54, 1.54])
     # Translations between Seg0 and Seg1 at t0, calculated with cos and sin as Seg1 has no parent
     t_t0 = np.array([np.sin(q_t0[0]), -np.cos(q_t0[0])])
-    # Rotations at t1
-    q_t1 = np.array([1.545, 1.545])
-    # Translations between Seg0 and Seg1 at t1, calculated with cos and sin as Seg1 has no parent
-    t_t1 = np.array([np.sin(q_t1[0]), -np.cos(q_t1[0])])
 
     all_q_t0 = np.array([q_t0[0], t_t0[0], t_t0[1], q_t0[1]])
-    all_q_t1 = np.array([q_t1[0], t_t1[0], t_t1[1], q_t1[1]])
 
     # build  constraint
     # the origin of the second pendulum is constrained to the tip of the first pendulum
@@ -42,9 +37,6 @@ def two_pendulums(time: float = 10, time_step: float = 0.05, unit_test: bool = F
     fcn_constraint = Function("constraint", [q_sym], [constraint], ["q"], ["constraint"]).expand()
     fcn_jacobian = Function("jacobian", [q_sym], [jacobian(constraint, q_sym)], ["q"], ["jacobian"]).expand()
 
-    # test the constraint
-    print(fcn_constraint(all_q_t0))
-
     # variational integrator
     vi = VariationalIntegrator(
         biorbd_model=biorbd_casadi_model,
@@ -52,9 +44,10 @@ def two_pendulums(time: float = 10, time_step: float = 0.05, unit_test: bool = F
         time=time,
         constraints=fcn_constraint,
         jac=fcn_jacobian,
-        q_init=np.concatenate((all_q_t0[:, np.newaxis], all_q_t1[:, np.newaxis]), axis=1),
+        q_init=all_q_t0[:, np.newaxis],
+        q_dot_init=np.zeros((biorbd_casadi_model.nbQ(), 1)),
     )
-    q_vi, lambdas_vi, _ = vi.integrate()
+    q_vi, lambdas_vi, q_vi_dot = vi.integrate()
 
     tic2 = t.time()
     print(tic2 - tic0)
@@ -111,7 +104,10 @@ def two_pendulums(time: float = 10, time_step: float = 0.05, unit_test: bool = F
 
         plt.show()
 
-    return q_vi
+        np.set_printoptions(formatter={"float": lambda x: "{0:0.15f}".format(x)})
+        print(q_vi[:, -1], q_vi_dot)
+
+    return q_vi, q_vi_dot
 
 
 if __name__ == "__main__":

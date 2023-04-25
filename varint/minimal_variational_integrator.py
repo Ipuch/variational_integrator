@@ -20,7 +20,7 @@ class VariationalIntegrator:
         time_step: float,
         time: float,
         q_init: np.ndarray,
-        q_dot_init: np.ndarray = None,
+        q_dot_init: np.ndarray,
         constraints: Function = None,
         jac: Function = None,
         discrete_approximation: QuadratureRule = QuadratureRule.TRAPEZOIDAL,
@@ -29,6 +29,7 @@ class VariationalIntegrator:
         forces: Function = None,
         # force_approximation: QuadratureRule = QuadratureRule.TRAPEZOIDAL,
         newton_descent_tolerance: float = 1e-14,
+        ignore_initial_constraints=False,
     ):
         """
         Parameters
@@ -41,12 +42,10 @@ class VariationalIntegrator:
             The duration of the integration.
         q_init: np.ndarray
             The initial position of the system. q_init must have the same number of rows as the number of degrees of
-            freedom. It can have two columns if you want to specify the two first positions of the system, in this case
-            you can't specify q_dot_init. If you want to specify the initial position and the initial velocity, you need
-            to specify q_init with only one column and q_dot_init.
+            freedom. It needs to have only one column.
         q_dot_init: np.ndarray
             The initial velocity of the system. q_dot_init must have the same number of rows as the number of degrees of
-            freedom. It needs to have only one column and q_init needs to have only one column too.
+            freedom. It needs to have only one column.
         constraints: Callable
             The constraints of the system only one callable for now
         jac: Callable
@@ -64,13 +63,9 @@ class VariationalIntegrator:
         """
         # `check approximation` and `control_type`
         if discrete_approximation not in QuadratureRule:
-            raise NotImplementedError(
-                f"Discrete {self.discrete_approximation} is not implemented"
-            )
+            raise NotImplementedError(f"Discrete {self.discrete_approximation} is not implemented")
         if control_type not in ControlType:
-            raise NotImplementedError(
-                f"Control {self.discrete_approximation} is not implemented"
-            )
+            raise NotImplementedError(f"Control {self.discrete_approximation} is not implemented")
 
         self.biorbd_model = biorbd_model
         self.time_step = time_step
@@ -116,23 +111,27 @@ class VariationalIntegrator:
         self.newton_descent_tolerance = newton_descent_tolerance
 
         # check q_init
-        if q_dot_init is not None:
-            if q_init.shape[0] != biorbd_model.nbQ():
-                raise ValueError("q_init must have the same number of rows as the number of degrees of freedom")
-            if q_dot_init.shape[0] != biorbd_model.nbQ():
-                raise ValueError("q_dot_init must have the same number of rows as the number of degrees of freedom")
-            if q_init.shape[1] != 1:
-                raise ValueError("If an initial velocity is given (q_dot_init), q_init must have one columns (q0)")
-            if q_dot_init.shape[1] != 1:
-                raise ValueError("q_dot_init must have one columns (q0_dot)")
-            self.q1_num, self.q2_num = self._compute_initial_states(q_init, q_dot_init)
-        else:
-            if q_init.shape[0] != biorbd_model.nbQ():
-                raise ValueError("q_init must have the same number of rows as the number of degrees of freedom")
-            if q_init.shape[1] != 2:
-                raise ValueError("q_init must have two columns, one q0 and one q1")
-            self.q1_num = q_init[:, 0]
-            self.q2_num = q_init[:, 1]
+        if q_init.shape[0] != biorbd_model.nbQ():
+            raise ValueError("q_init must have the same number of rows as the number of degrees of freedom")
+        if q_dot_init.shape[0] != biorbd_model.nbQ():
+            raise ValueError("q_dot_init must have the same number of rows as the number of degrees of freedom")
+        if q_init.shape[1] != 1:
+            raise ValueError("If an initial velocity is given (q_dot_init), q_init must have one columns (q0)")
+        if q_dot_init.shape[1] != 1:
+            raise ValueError("q_dot_init must have one columns (q0_dot)")
+
+        # `check constraints`
+        if constraints is not None and not ignore_initial_constraints:
+            try:
+                np.testing.assert_almost_equal(
+                    constraints(q_init),
+                    np.zeros((constraints.nnz_out(), 1)),
+                    decimal=15,
+                )
+            except:
+                raise ValueError("The initial position does not respect the constraints.")
+
+        self.q1_num, self.q2_num, self.lambdas0 = self._compute_initial_states(q_init[:, 0], q_dot_init[:, 0])
 
     def _compute_initial_states(self, q_init, q_dot_init):
         # Declare the MX variables
@@ -141,18 +140,24 @@ class VariationalIntegrator:
         q1 = MX.sym("q1", self.biorbd_model.nbQ(), 1)
         f0_minus = MX.sym("f0_minus", self.biorbd_model.nbQ(), 1)
 
-        # Equation (3.15c) in the paper Discrete Mechanics and Optimal Control: an Analysis
-        # (https://arxiv.org/pdf/0810.1386.pdf)
+        # The following equation as been calculated thanks to the paper "Discrete mechanics and optimal control for
+        # constrained systems" (https://onlinelibrary.wiley.com/doi/epdf/10.1002/oca.912), equations (14) and the
+        # indications given just before the equation (18) for p0 and pN.
         D2_L_q0_q0dot = transpose(jacobian(self.lagrangian(q0, q0_dot), q0_dot))
         D1_Ld_q0_q1 = transpose(jacobian(self.discrete_lagrangian(q0, q1), q0))
         # The constraint term is added as in _discrete_euler_lagrange_equations
-        constraint_term = transpose(self.jac(q0)) @ self.lambdas if self.constraints is not None else MX.zeros(
-            self.biorbd_model.nbQ(), 1)
+        constraint_term = (
+            1 / 2 * transpose(self.jac(q0)) @ self.lambdas
+            if self.constraints is not None
+            else MX.zeros(self.biorbd_model.nbQ(), 1)
+        )
         output = [D2_L_q0_q0dot + D1_Ld_q0_q1 + f0_minus - constraint_term]
 
         initial_states_fun = Function("initial_states", [q0, q0_dot, q1, f0_minus, self.lambdas], output).expand()
 
-        mx_residuals = initial_states_fun(q_init[:, 0], q_dot_init[:, 0], q1, self.controls[:, 0], self.lambdas)
+        mx_residuals = initial_states_fun(
+            q_init, q_dot_init, q1, self.control_approximation(self.controls[:, 0], self.controls[:, 1]), self.lambdas
+        )
         decision_variables = q1
 
         if (
@@ -169,8 +174,7 @@ class VariationalIntegrator:
         ).expand()
 
         # Create a implicit function instance to solve the system of equations
-        opts = {}
-        opts["abstol"] = self.newton_descent_tolerance
+        opts = {"abstol": self.newton_descent_tolerance}
         ifcn = rootfinder("ifcn", "newton", residuals, opts)
 
         if self.constraints is not None:
@@ -179,30 +183,52 @@ class VariationalIntegrator:
         else:
             lambdas_num = np.zeros((0, self.nb_steps))
 
-        v_init = self._dispatch_to_v(q_init[:, 0] + q_dot_init[:, 0] * self.time_step, lambdas_num)
+        v_init = self._dispatch_to_v(q_init + q_dot_init * self.time_step, lambdas_num)
         v_opt = ifcn(v_init)
-        q1_opt, _ = self._dispatch_to_q_lambdas(v_opt)
+        q1_opt, lambdas0_opt = self._dispatch_to_q_lambdas(v_opt)
 
-        return q_init, q1_opt
+        if self.constraints is not None:
+            return q_init, np.asarray(q1_opt)[:, 0], np.asarray(lambdas0_opt)[:, 0]
+        else:
+            return q_init, np.asarray(q1_opt)[:, 0], None
 
-    def compute_final_velocity(self, q_penultimate, q_ultimate):
+    def _compute_final_velocity(self, q_penultimate, q_ultimate):
         # Declare the MX variables
         qN = MX.sym("qN", self.biorbd_model.nbQ(), 1)
         qN_dot = MX.sym("qN_dot", self.biorbd_model.nbQ(), 1)
         qN_minus_1 = MX.sym("qN_minus_1", self.biorbd_model.nbQ(), 1)
         fd_plus = MX.sym("fd_plus", self.biorbd_model.nbQ(), 1)
 
-        # Equation (3.14) in the paper Discrete Mechanics and Optimal Control: an Analysis
-        # (https://arxiv.org/pdf/0810.1386.pdf)
+        # The following equation as been calculated thanks to the paper "Discrete mechanics and optimal control for
+        # constrained systems" (https://onlinelibrary.wiley.com/doi/epdf/10.1002/oca.912), equations (14) and the
+        # indications given just before the equation (18) for p0 and pN.
         D2_L_qN_qN_dot = transpose(jacobian(self.lagrangian(qN, qN_dot), qN_dot))
         D2_Ld_qN_minus_1_qN = transpose(jacobian(self.discrete_lagrangian(qN_minus_1, qN), qN))
         # The constraint term is added as in _discrete_euler_lagrange_equations
-        output = [- D2_L_qN_qN_dot + D2_Ld_qN_minus_1_qN + fd_plus]
+        constraint_term = (
+            1 / 2 * transpose(self.jac(qN)) @ self.lambdas
+            if self.constraints is not None
+            else MX.zeros(self.biorbd_model.nbQ(), 1)
+        )
+        output = [-D2_L_qN_qN_dot + D2_Ld_qN_minus_1_qN - constraint_term + fd_plus]
 
-        initial_states_fun = Function("terminal_velocity", [qN, qN_dot, qN_minus_1, fd_plus], output).expand()
+        final_states_fun = Function("final_velocity", [qN, qN_dot, qN_minus_1, fd_plus, self.lambdas], output).expand()
 
-        mx_residuals = initial_states_fun(q_ultimate, qN_dot, q_penultimate, self.controls[:, -1])
+        mx_residuals = final_states_fun(
+            q_ultimate,
+            qN_dot,
+            q_penultimate,
+            self.control_approximation(self.controls[:, -2], self.controls[:, -1]),
+            self.lambdas,
+        )
         decision_variables = qN_dot
+
+        if (
+            self.variational_integrator_type == VariationalIntegratorType.CONSTRAINED_DISCRETE_EULER_LAGRANGE
+            or self.variational_integrator_type == VariationalIntegratorType.FORCED_CONSTRAINED_DISCRETE_EULER_LAGRANGE
+        ):
+            decision_variables = vertcat(decision_variables, self.lambdas)
+            mx_residuals = vertcat(mx_residuals, self.constraints(qN_dot))
 
         residuals = Function(
             "final_states_residuals",
@@ -214,9 +240,20 @@ class VariationalIntegrator:
         opts = {"abstol": self.newton_descent_tolerance}
         ifcn = rootfinder("ifcn", "newton", residuals, opts)
 
-        qN_dot = ifcn((q_ultimate - q_penultimate) / self.time_step)
+        if self.constraints is not None:
+            lambdas_all = np.zeros((self.constraints.nnz_out(), self.nb_steps))
+            lambdas_num = lambdas_all[:, 0]
+        else:
+            lambdas_num = np.zeros((0, self.nb_steps))
 
-        return qN_dot
+        v_init = self._dispatch_to_v((q_ultimate - q_penultimate) / self.time_step, lambdas_num)
+        v_opt = ifcn(v_init)
+        qN_dot_opt, lambdasN_opt = self._dispatch_to_q_lambdas(v_opt)
+
+        if self.constraints is not None:
+            return np.asarray(qN_dot_opt)[:, 0], np.asarray(lambdasN_opt)[:, 0]
+        else:
+            return np.asarray(qN_dot_opt)[:, 0]
 
     def _declare_mx(self):
         """
@@ -241,7 +278,15 @@ class VariationalIntegrator:
         Declare the discrete Euler-Lagrange equations
         """
         # list of symbolic variables needed for the integration
-        self.sym_list = [self.q_prev, self.q_cur, self.q_next, self.lambdas, self.control_prev, self.control_cur, self.control_next]
+        self.sym_list = [
+            self.q_prev,
+            self.q_cur,
+            self.q_next,
+            self.lambdas,
+            self.control_prev,
+            self.control_cur,
+            self.control_next,
+        ]
 
         # output of the discrete Euler-Lagrange equations
         output = [
@@ -337,9 +382,7 @@ class VariationalIntegrator:
             qdot_discrete = (q2 - q1) / self.time_step
             return MX(self.time_step) / 2 * (self.lagrangian(q1, qdot_discrete) + self.lagrangian(q2, qdot_discrete))
         else:
-            raise NotImplementedError(
-                f"Discrete Lagrangian {self.discrete_approximation} is not implemented"
-            )
+            raise NotImplementedError(f"Discrete Lagrangian {self.discrete_approximation} is not implemented")
 
     # def discrete_force(self, q_prev: MX | SX, q_cur: MX | SX) -> MX | SX:
     #     """
@@ -429,9 +472,17 @@ class VariationalIntegrator:
         p_current = self.compute_p_current(q_prev, q_cur)  # momentum at current time step
 
         D1_Ld_qcur_qnext = transpose(jacobian(self.discrete_lagrangian(q_cur, q_next), q_cur))
-        constraint_term = transpose(self.jac(q_cur)) @ lambdas if self.constraints is not None else MX.zeros(p_current.shape)
+        constraint_term = (
+            transpose(self.jac(q_cur)) @ lambdas if self.constraints is not None else MX.zeros(p_current.shape)
+        )
 
-        return p_current + D1_Ld_qcur_qnext - constraint_term + self.control_approximation(control_prev, control_cur) + self.control_approximation(control_cur, control_next)
+        return (
+            p_current
+            + D1_Ld_qcur_qnext
+            - constraint_term
+            + self.control_approximation(control_prev, control_cur)
+            + self.control_approximation(control_cur, control_next)
+        )
 
     def control_approximation(
         self,
@@ -439,7 +490,8 @@ class VariationalIntegrator:
         control_plus: MX | SX,
     ):
         """
-        Compute the term associated to the discrete forcing.
+        Compute the term associated to the discrete forcing. The term associated to the controls in the Lagrangian
+        equations is homo geneous to a force or a torque multiplied by a time.
 
         Parameters
         ----------
@@ -483,13 +535,13 @@ class VariationalIntegrator:
 
         if self.constraints is not None:
             lambdas_all = np.zeros((self.constraints.nnz_out(), self.nb_steps))
+            lambdas_all[:, 0] = self.lambdas0
             lambdas_num = lambdas_all[:, 0]
         else:
             lambdas_all = None
             lambdas_num = np.zeros((0, self.nb_steps))
 
         for i in range(2, self.nb_steps):
-
             if self.controls is not None:
                 u_prev = self.controls[:, i - 2]
                 u_cur = self.controls[:, i - 1]
@@ -512,10 +564,12 @@ class VariationalIntegrator:
 
             # store the results
             if self.constraints is not None:
-                lambdas_all[:, i] = lambdas_num.toarray().squeeze()
-            q_all[:, i] = q_next.toarray().squeeze()
-
-        q_dot_final = self.compute_final_velocity(q_all[:, -2], q_all[:, -1])
+                lambdas_all[:, i - 1] = lambdas_num.toarray().squeeze()
+                q_all[:, i] = q_next.toarray().squeeze()
+                q_dot_final, lambdas_all[:, -1] = self._compute_final_velocity(q_all[:, -2], q_all[:, -1])
+            else:
+                q_all[:, i] = q_next.toarray().squeeze()
+                q_dot_final = self._compute_final_velocity(q_all[:, -2], q_all[:, -1])
 
         return q_all, lambdas_all, q_dot_final
 

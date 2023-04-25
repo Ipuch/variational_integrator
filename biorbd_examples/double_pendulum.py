@@ -4,6 +4,7 @@ and a first order quadrature method.
 This example is a double pendulum and compares the integrations obtained by 3 different integrators.
 """
 import biorbd_casadi
+import numpy as np
 
 from varint.minimal_variational_integrator import VariationalIntegrator
 
@@ -16,18 +17,19 @@ def double_pendulum(time: float = 60, time_step: float = 0.05, unit_test: bool =
 
     import time as t
 
-    # multistep_integrator = "RK45"  # DOP853
     multistep_integrator = "DOP853"  # DOP853
 
     tic0 = t.time()
 
     from scipy.integrate import solve_ivp
 
-    q0 = np.array([[1.54, 1.545], [1.54, 1.545]])
-    qdot0 = (q0[:, 0] - q0[:, 1]) / time_step
-    x0 = np.hstack((q0[:, 0], qdot0))
+    q0 = np.array([[1.54], [1.54]])
+    qdot0 = np.array([[0.0], [0.0]])
+
+    x0 = np.hstack((q0[:, 0], qdot0[:, 0]))
     fd = lambda t, x: forward_dynamics(biorbd_model, x[0:2], x[2:4], np.array([0]))
     q_rk45 = solve_ivp(fd, [0, time], x0, method=multistep_integrator, t_eval=np.arange(0, time, time_step)).y
+
     from ode_solvers import RK4
 
     q_rk4 = RK4(np.arange(0, time, time_step), fd, x0)
@@ -41,7 +43,8 @@ def double_pendulum(time: float = 60, time_step: float = 0.05, unit_test: bool =
         biorbd_model=biorbd_casadi_model,
         time_step=time_step,
         time=time,
-        q_init=np.concatenate((q_rk45[:2, 0:1], q_rk45[:2, 1:2]), axis=1),
+        q_init=q0,
+        q_dot_init=qdot0,
         discrete_approximation=QuadratureRule.MIDPOINT,
     )
     # vi.set_initial_values(q_prev=1.54, q_cur=1.545)
@@ -49,19 +52,6 @@ def double_pendulum(time: float = 60, time_step: float = 0.05, unit_test: bool =
 
     tic2 = t.time()
     print(tic2 - tic1)
-
-    print(f"Final velocity with variational integrator (two initial states):"
-          f" {qdot_final}, "
-          f"with {multistep_integrator}: {q_rk45[2:, -1]}, "
-          f"with RK4: {q_rk4[2:, -1]}")
-
-    print(f"({multistep_integrator}) Final velocity calculated with the variational integrator function: "
-          f"{vi.compute_final_velocity(q_rk45[:2, -2], q_rk45[:2, -1])}, "
-          f"VS the one calculated with {multistep_integrator} {q_rk45[2:, -1]}")
-
-    print(f"(RK4) Final velocity calculated with the variational integrator function: "
-          f"{vi.compute_final_velocity(q_rk4[:2, -2], q_rk4[:2, -1])}, "
-          f"VS the one calculated with RK4 {q_rk4[2:, -1]}")
 
     if unit_test:
         import bioviz
@@ -92,7 +82,13 @@ def double_pendulum(time: float = 60, time_step: float = 0.05, unit_test: bool =
             markersize=2,
         )
         axs[0].plot(
-            np.arange(0, time, time_step), q_rk4[0, :], label="RK4", color="green", linestyle="-", marker="", markersize=2
+            np.arange(0, time, time_step),
+            q_rk4[0, :],
+            label="RK4",
+            color="green",
+            linestyle="-",
+            marker="",
+            markersize=2,
         )
         axs[0].set_title("q0")
         axs[0].legend()
@@ -115,14 +111,24 @@ def double_pendulum(time: float = 60, time_step: float = 0.05, unit_test: bool =
             markersize=2,
         )
         axs[1].plot(
-            np.arange(0, time, time_step), q_rk4[1, :], label="RK4", color="green", linestyle="-", marker="", markersize=2
+            np.arange(0, time, time_step),
+            q_rk4[1, :],
+            label="RK4",
+            color="green",
+            linestyle="-",
+            marker="",
+            markersize=2,
         )
         axs[1].set_title("q1")
         axs[1].legend()
 
         # plot total energy for both methods
         plt.figure()
-        plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step, discrete_approximation=QuadratureRule.MIDPOINT), label="Variational Integrator", color="red")
+        plt.plot(
+            discrete_total_energy(biorbd_model, q_vi, time_step, discrete_approximation=QuadratureRule.MIDPOINT),
+            label="Variational Integrator",
+            color="red",
+        )
         plt.plot(total_energy(biorbd_model, q_rk45[0, :], q_rk45[1, :]), label=multistep_integrator, color="blue")
         plt.plot(total_energy(biorbd_model, q_rk4[0, :], q_rk4[1, :]), label="RK4", color="green")
         plt.title(f"Total energy comparison between RK45, {multistep_integrator} and variational integrator")
@@ -130,7 +136,10 @@ def double_pendulum(time: float = 60, time_step: float = 0.05, unit_test: bool =
 
         plt.show()
 
-    return q_vi
+        np.set_printoptions(formatter={"float": lambda x: "{0:0.15f}".format(x)})
+        print(q_vi[:, -1], qdot_final)
+
+    return q_vi, qdot_final
 
 
 if __name__ == "__main__":

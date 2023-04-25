@@ -25,10 +25,8 @@ def one_pendulum_force(time: float = 10, time_step: float = 0.05, unit_test: boo
     tic0 = t.time()
 
     q_t0 = np.array([1.54])
-    q_t1 = np.array([1.545])
 
     all_q_t0 = np.array([0, 0, q_t0[0]])
-    all_q_t1 = np.array([0, 0, q_t1[0]])
 
     # build  constraint
     # the origin of the second pendulum is constrained to the tip of the first pendulum
@@ -36,9 +34,6 @@ def one_pendulum_force(time: float = 10, time_step: float = 0.05, unit_test: boo
     constraint = biorbd_casadi_model.markers(q_sym)[0].to_mx()[1:] - MX.zeros((2, 1))
     fcn_constraint = Function("constraint", [q_sym], [constraint], ["q"], ["constraint"]).expand()
     fcn_jacobian = Function("jacobian", [q_sym], [jacobian(constraint, q_sym)], ["q"], ["jacobian"]).expand()
-
-    # test the constraint
-    print(fcn_constraint(all_q_t0))
 
     # controls
     torque = 1
@@ -53,9 +48,10 @@ def one_pendulum_force(time: float = 10, time_step: float = 0.05, unit_test: boo
         constraints=fcn_constraint,
         jac=fcn_jacobian,
         controls=tau,
-        q_init=np.concatenate((all_q_t0[:, np.newaxis], all_q_t1[:, np.newaxis]), axis=1),
+        q_init=all_q_t0[:, np.newaxis],
+        q_dot_init=np.zeros((biorbd_casadi_model.nbQ(), 1)),
     )
-    q_vi, lambdas_vi, _ = vi.integrate()
+    q_vi, lambdas_vi, q_vi_dot = vi.integrate()
 
     tic2 = t.time()
     print(tic2 - tic0)
@@ -94,7 +90,13 @@ def one_pendulum_force(time: float = 10, time_step: float = 0.05, unit_test: boo
 
         # Plot total energy for both methods
         plt.figure()
-        plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step).reshape(discrete_total_energy(biorbd_model, q_vi, time_step).shape[0]) - work(tau, q_vi)[:-1], label="Total energy")
+        plt.plot(
+            discrete_total_energy(biorbd_model, q_vi, time_step).reshape(
+                discrete_total_energy(biorbd_model, q_vi, time_step).shape[0]
+            )
+            - work(tau, q_vi)[:-1],
+            label="Total energy",
+        )
         plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step), label="Mechanical energy")
         plt.legend()
         plt.title("Total energy")
@@ -108,7 +110,10 @@ def one_pendulum_force(time: float = 10, time_step: float = 0.05, unit_test: boo
 
         plt.show()
 
-    return q_vi
+        np.set_printoptions(formatter={"float": lambda x: "{0:0.15f}".format(x)})
+        print(q_vi[:, -1], q_vi_dot)
+
+    return q_vi, q_vi_dot
 
 
 if __name__ == "__main__":

@@ -85,12 +85,14 @@ def total_energy(biorbd_model: biorbd.Model, q: np.ndarray, qdot: np.ndarray) ->
     """
     H = np.zeros((q.shape[0]))
     for i in range(q.shape[0]):
-        H[i] = total_energy_i(biorbd_model, q[i: i + 1], qdot[i: i + 1])
+        H[i] = total_energy_i(biorbd_model, q[i : i + 1], qdot[i : i + 1])
 
     return H
 
 
-def discrete_total_energy_i(biorbd_model: biorbd.Model, q1: np.ndarray, q2: np.ndarray, time_step, discrete_approximation) -> np.ndarray:
+def discrete_total_energy_i(
+    biorbd_model: biorbd.Model, q1: np.ndarray, q2: np.ndarray, time_step, discrete_approximation
+) -> np.ndarray:
     """
     Compute the discrete total energy of a biorbd model
 
@@ -121,9 +123,7 @@ def discrete_total_energy_i(biorbd_model: biorbd.Model, q1: np.ndarray, q2: np.n
     elif discrete_approximation == QuadratureRule.TRAPEZOIDAL:
         q = (q1 + q2) / 2
     else:
-        raise NotImplementedError(
-            f"Discrete energy computation {discrete_approximation} is not implemented"
-        )
+        raise NotImplementedError(f"Discrete energy computation {discrete_approximation} is not implemented")
     qdot = (q2 - q1) / time_step
     return total_energy_i(biorbd_model, np.array(q), np.array(qdot))
 
@@ -156,7 +156,9 @@ def discrete_total_energy(
     n_frames = q.shape[1]
     discrete_total_energy = np.zeros((n_frames - 1, 1))
     for i in range(n_frames - 1):
-        discrete_total_energy[i] = discrete_total_energy_i(biorbd_model, q[:, i], q[:, i + 1], time_step, discrete_approximation)
+        discrete_total_energy[i] = discrete_total_energy_i(
+            biorbd_model, q[:, i], q[:, i + 1], time_step, discrete_approximation
+        )
     return discrete_total_energy
 
 
@@ -192,17 +194,13 @@ def energy_calculation(biorbd_model, q, n, time_step):
         # Rotational kinetic energy
         I_G = biorbd_model.segments()[Seg].characteristics().inertia().to_array()
         q_coord_rel_dot = (q_coord_rel[Seg, 1:] - q_coord_rel[Seg, :-1]) / time_step
-        Ec_rot = 1 / 2 * I_G[0, 0] * q_coord_rel_dot ** 2
+        Ec_rot = 1 / 2 * I_G[0, 0] * q_coord_rel_dot**2
         # Translational kinetic energy
-        y_com = np.asarray(
-            [biorbd_model.markers(q[:, i])[CoM_marker].to_array()[1] for i in range(len(q[0, :]))]
-        )
-        z_com = np.asarray(
-            [biorbd_model.markers(q[:, i])[CoM_marker].to_array()[2] for i in range(len(q[0, :]))]
-        )
+        y_com = np.asarray([biorbd_model.markers(q[:, i])[CoM_marker].to_array()[1] for i in range(len(q[0, :]))])
+        z_com = np.asarray([biorbd_model.markers(q[:, i])[CoM_marker].to_array()[2] for i in range(len(q[0, :]))])
         vy_com = (y_com[1:] - y_com[:-1]) / time_step
         vz_com = (z_com[1:] - z_com[:-1]) / time_step
-        V_com_sq = vy_com ** 2 + vz_com ** 2
+        V_com_sq = vy_com**2 + vz_com**2
         Ec_trs = 1 / 2 * biorbd_model.segments()[Seg].characteristics().mass() * V_com_sq
 
         Ec.append(Ec_trs + Ec_rot)
