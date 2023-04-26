@@ -28,12 +28,8 @@ def pendulum(time: float = 600, time_step: float = 0.01, unit_test: bool = False
     x0 = np.hstack((q0, qdot0))
     fd = lambda t, x: forward_dynamics(biorbd_model, np.array([x[0]]), np.array([x[1]]), np.array([0]))
     q_rk45 = solve_ivp(fd, [0, time], x0, method=multistep_integrator, t_eval=np.arange(0, time, time_step)).y
-    from ode_solvers import RK4
-
-    q_rk4 = RK4(np.arange(0, time, time_step), fd, x0)
 
     tic1 = t.time()
-
     print(tic1 - tic0)
 
     # variational integrator
@@ -44,7 +40,6 @@ def pendulum(time: float = 600, time_step: float = 0.01, unit_test: bool = False
         q_init=np.array([[q0]]),
         q_dot_init=np.array([[0.0]]),
     )
-    # vi.set_initial_values(q_prev=q_rk45[0, 0], q_cur=q_rk45[0, 1])
     q_vi, _, q_vi_dot = vi.integrate()
 
     tic2 = t.time()
@@ -56,16 +51,14 @@ def pendulum(time: float = 600, time_step: float = 0.01, unit_test: bool = False
         plt.figure()
         plt.plot(q_vi[0, 1:], label="Variational Integrator", color="red", linestyle="-", marker="", markersize=2)
         plt.plot(q_rk45[0, 0:-1], label=multistep_integrator, color="blue", linestyle="-", marker="", markersize=2)
-        plt.plot(q_rk4[0, 0:-1], label="RK4", color="green", linestyle="-", marker="", markersize=2)
-        plt.title(f"Generalized coordinates comparison between RK45, {multistep_integrator} and variational integrator")
+        plt.title(f"Generalized coordinates comparison between {multistep_integrator} and variational integrator")
         plt.legend()
 
         # plot total energy for both methods
         plt.figure()
         plt.plot(discrete_total_energy(biorbd_model, q_vi, time_step), label="Variational Integrator", color="red")
         plt.plot(total_energy(biorbd_model, q_rk45[0, :], q_rk45[1, :]), label=multistep_integrator, color="blue")
-        plt.plot(total_energy(biorbd_model, q_rk4[0, :], q_rk4[1, :]), label="RK4", color="green")
-        plt.title(f"Total energy comparison between RK45, {multistep_integrator} and variational integrator")
+        plt.title(f"Total energy comparison between {multistep_integrator} and variational integrator")
         plt.legend()
 
         plt.show()

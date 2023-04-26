@@ -11,7 +11,7 @@ from varint.minimal_variational_integrator import VariationalIntegrator
 from biorbd_examples.utils import *
 
 
-def double_pendulum(time: float = 60, time_step: float = 0.05, unit_test: bool = False):
+def double_pendulum(time: float = 1, time_step: float = 0.05, unit_test: bool = False):
     biorbd_casadi_model = biorbd_casadi.Model(Models.DOUBLE_PENDULUM.value)
     biorbd_model = biorbd.Model(Models.DOUBLE_PENDULUM.value)
 
@@ -30,12 +30,7 @@ def double_pendulum(time: float = 60, time_step: float = 0.05, unit_test: bool =
     fd = lambda t, x: forward_dynamics(biorbd_model, x[0:2], x[2:4], np.array([0]))
     q_rk45 = solve_ivp(fd, [0, time], x0, method=multistep_integrator, t_eval=np.arange(0, time, time_step)).y
 
-    from ode_solvers import RK4
-
-    q_rk4 = RK4(np.arange(0, time, time_step), fd, x0)
-
     tic1 = t.time()
-
     print(tic1 - tic0)
 
     # variational integrator
@@ -81,15 +76,6 @@ def double_pendulum(time: float = 60, time_step: float = 0.05, unit_test: bool =
             marker="",
             markersize=2,
         )
-        axs[0].plot(
-            np.arange(0, time, time_step),
-            q_rk4[0, :],
-            label="RK4",
-            color="green",
-            linestyle="-",
-            marker="",
-            markersize=2,
-        )
         axs[0].set_title("q0")
         axs[0].legend()
         axs[1].plot(
@@ -110,15 +96,6 @@ def double_pendulum(time: float = 60, time_step: float = 0.05, unit_test: bool =
             marker="",
             markersize=2,
         )
-        axs[1].plot(
-            np.arange(0, time, time_step),
-            q_rk4[1, :],
-            label="RK4",
-            color="green",
-            linestyle="-",
-            marker="",
-            markersize=2,
-        )
         axs[1].set_title("q1")
         axs[1].legend()
 
@@ -130,8 +107,7 @@ def double_pendulum(time: float = 60, time_step: float = 0.05, unit_test: bool =
             color="red",
         )
         plt.plot(total_energy(biorbd_model, q_rk45[0, :], q_rk45[1, :]), label=multistep_integrator, color="blue")
-        plt.plot(total_energy(biorbd_model, q_rk4[0, :], q_rk4[1, :]), label="RK4", color="green")
-        plt.title(f"Total energy comparison between RK45, {multistep_integrator} and variational integrator")
+        plt.title(f"Total energy comparison between {multistep_integrator} and variational integrator")
         plt.legend()
 
         plt.show()
