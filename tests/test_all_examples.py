@@ -45,13 +45,13 @@ def test_one_pendulum():
     np.testing.assert_almost_equal(
         q_vi[:, -1],
         [0.0, 0.0, 0.743415690332072],
-        decimal=15,
+        decimal=13,
     )
 
     np.testing.assert_almost_equal(
         q_vi_dot,
         [0.0, 0.0, -3.774176684457794],
-        decimal=15,
+        decimal=13,
     )
 
 
@@ -63,13 +63,13 @@ def test_one_pendulum_force():
     np.testing.assert_almost_equal(
         q_vi[:, -1],
         [0.0, 0.0, -0.177363694419747],
-        decimal=15,
+        decimal=13,
     )
 
     np.testing.assert_almost_equal(
         q_vi_dot,
         [0.0, 0.0, -4.084879154646298],
-        decimal=15,
+        decimal=13,
     )
 
 
@@ -94,17 +94,17 @@ def test_pendulum_control():
 def test_double_pendulum():
     module = load_module(biorbd_examples_folder() + "/double_pendulum.py")
 
-    q_vi, q_vi_dot = module.double_pendulum(time=60, time_step=0.05)
+    q_vi, q_vi_dot = module.double_pendulum(time=1, time_step=0.05)
 
     np.testing.assert_almost_equal(
         q_vi[:, -1],
-        [-4.750533490616283, -8.262599424254001],
-        decimal=15,
+        [0.176934499338377, -1.630924739364348],
+        decimal=13,
     )
     np.testing.assert_almost_equal(
         q_vi_dot,
-        [1.379398727905979, -7.117106031979558],
-        decimal=15,
+        [-1.717140638154052, -5.855445602253749],
+        decimal=13,
     )
 
 

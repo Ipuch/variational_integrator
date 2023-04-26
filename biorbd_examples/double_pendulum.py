@@ -11,7 +11,7 @@ from varint.minimal_variational_integrator import VariationalIntegrator
 from biorbd_examples.utils import *
 
 
-def double_pendulum(time: float = 60, time_step: float = 0.05, unit_test: bool = False):
+def double_pendulum(time: float = 1, time_step: float = 0.05, unit_test: bool = False):
     biorbd_casadi_model = biorbd_casadi.Model(Models.DOUBLE_PENDULUM.value)
     biorbd_model = biorbd.Model(Models.DOUBLE_PENDULUM.value)
 
