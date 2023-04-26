@@ -21,6 +21,7 @@ def load_module(path: str):
 
 
 def test_pendulum():
+    """ Test the pendulum example """
     module = load_module(biorbd_examples_folder() + "/pendulum.py")
 
     q_vi, q_vi_dot = module.pendulum(time=1, time_step=0.01)
