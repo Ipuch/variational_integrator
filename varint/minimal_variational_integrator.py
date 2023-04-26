@@ -45,7 +45,7 @@ class VariationalIntegrator:
         The position at the first (0) time step.
     q1_num: np.ndarray
         The position at the second (1) time step.
-    lambda0: np.ndarray
+    lambdas0: np.ndarray
         The initial value of the Lagrange multipliers.
     lambdas: MX
         The Lagrange multipliers.
