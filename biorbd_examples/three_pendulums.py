@@ -13,7 +13,7 @@ from varint.minimal_variational_integrator import VariationalIntegrator
 from biorbd_examples.utils import *
 
 
-def three_pendulums(time: float = 20, time_step: float = 0.05, unit_test=False):
+def three_pendulums(time: float = 1, time_step: float = 0.05, unit_test=False):
     biorbd_casadi_model = biorbd_casadi.Model(Models.THREE_PENDULUMS.value)
 
     # Rotations at t0
