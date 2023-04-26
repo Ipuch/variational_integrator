@@ -62,7 +62,7 @@ class VariationalIntegrator:
     control_next: MX
         The control at the next time step.
     dela: Function
-        The discrete Lagrangian.
+        The discrete Lagrangian callable function.
     sym_list: list
         The list of symbolic variables needed for the integration.
     residuals: Function
