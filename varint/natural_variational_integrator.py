@@ -44,7 +44,6 @@ class VariationalIntegrator:
         forces: Function = None,
         # force_approximation: QuadratureRule = QuadratureRule.TRAPEZOIDAL,
     ):
-
         # check q_init
         if q_init.shape[0] != biomodel.nb_Q:
             raise RuntimeError("q_init must have the same number of rows as the number of degrees of freedom")
@@ -140,7 +139,6 @@ class VariationalIntegrator:
             self.variational_integrator_type == VariationalIntegratorType.CONSTRAINED_DISCRETE_EULER_LAGRANGE
             or self.variational_integrator_type == VariationalIntegratorType.FORCED_CONSTRAINED_DISCRETE_EULER_LAGRANGE
         ):
-
             decision_variables = vertcat(decision_variables, self.lambdas)
             mx_residuals = vertcat(mx_residuals, self.constraints(self.q_next))
 
@@ -224,7 +222,11 @@ class VariationalIntegrator:
             # from : M. West, “Variational integrators,” Ph.D. dissertation, California Inst.
             # Technol., Pasadena, CA, 2004. p 13
             qdot_discrete = NaturalVelocities((q2 - q1) / self.time_step)
-            return MX(self.time_step) / 2 * (self.biomodel.lagrangian(q1, qdot_discrete) + self.biomodel.lagrangian(q2, qdot_discrete))
+            return (
+                MX(self.time_step)
+                / 2
+                * (self.biomodel.lagrangian(q1, qdot_discrete) + self.biomodel.lagrangian(q2, qdot_discrete))
+            )
         else:
             raise NotImplementedError(
                 f"Discrete Lagrangian {self.discrete_lagrangian_approximation} is not implemented"

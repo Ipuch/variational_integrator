@@ -35,4 +35,3 @@ def RK4(t: np.ndarray, f, y0: np.ndarray, args=()) -> np.ndarray:
         k4 = f(t[i] + h, yi + k3 * h, *args)
         y[:, i + 1] = yi + (h / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)
     return y
-

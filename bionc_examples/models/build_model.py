@@ -62,7 +62,6 @@ def build_n_link_pendulum(nb_segments: int = 20) -> BiomechanicalModel:
 
 
 if __name__ == "__main__":
-
     # Let's create a model
     nb_segments = 20
     model = build_n_link_pendulum(nb_segments=nb_segments)

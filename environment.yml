@@ -1,0 +1,12 @@
+# create a dev conda environment with: `make create_env` or `conda env create -f environment.yml`
+name: variational_integrator
+channels:
+- conda-forge
+- default
+dependencies:
+- python >=3.9
+- biorbd >=1.8.8
+- bioviz
+- bionc
+- numpy
+- packaging
