@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 def biorbd_examples_folder() -> str:
-    """ return the path to the biorbd examples folder"""
+    """return the path to the biorbd examples folder"""
     return str(Path(__file__).parent.parent / "biorbd_examples")
 
 

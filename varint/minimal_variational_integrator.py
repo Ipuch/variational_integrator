@@ -45,7 +45,7 @@ class VariationalIntegrator:
         The position at the first (0) time step.
     q1_num: np.ndarray
         The position at the second (1) time step.
-    lambdas0: np.ndarray
+    lambdas_0: np.ndarray
         The initial value of the Lagrange multipliers.
     lambdas: MX
         The Lagrange multipliers.
@@ -198,7 +198,7 @@ class VariationalIntegrator:
             except:
                 raise ValueError("The initial position does not respect the constraints.")
 
-        self.q0_num, self.q1_num, self.lambdas0 = self._compute_initial_states(q_init[:, 0], q_dot_init[:, 0])
+        self.q0_num, self.q1_num, self.lambdas_0 = self._compute_initial_states(q_init[:, 0], q_dot_init[:, 0])
 
     def _compute_initial_states(self, q_init, q_dot_init):
         # Declare the MX variables
@@ -252,10 +252,10 @@ class VariationalIntegrator:
 
         v_init = self._dispatch_to_v(q_init + q_dot_init * self.time_step, lambdas_num)
         v_opt = ifcn(v_init)
-        q1_opt, lambdas0_opt = self._dispatch_to_q_lambdas(v_opt)
+        q1_opt, lambdas_0_opt = self._dispatch_to_q_lambdas(v_opt)
 
         if self.constraints is not None:
-            return q_init, np.asarray(q1_opt)[:, 0], np.asarray(lambdas0_opt)[:, 0]
+            return q_init, np.asarray(q1_opt)[:, 0], np.asarray(lambdas_0_opt)[:, 0]
         else:
             return q_init, np.asarray(q1_opt)[:, 0], None
 
@@ -602,7 +602,7 @@ class VariationalIntegrator:
 
         if self.constraints is not None:
             lambdas_all = np.zeros((self.constraints.nnz_out(), self.nb_steps))
-            lambdas_all[:, 0] = self.lambdas0
+            lambdas_all[:, 0] = self.lambdas_0
             lambdas_num = lambdas_all[:, 0]
         else:
             lambdas_all = None
