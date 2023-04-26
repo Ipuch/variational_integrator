@@ -7,5 +7,6 @@ dependencies:
 - python >=3.9
 - biorbd >=1.8.8
 - bioviz
+- bionc
 - numpy
 - packaging
