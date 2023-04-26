@@ -8,6 +8,7 @@ def biorbd_examples_folder() -> str:
 
 
 def load_module(path: str):
+    """ Load a module from a path """
     module_name = path.split("/")[-1].split(".")[0]
     spec = importlib.util.spec_from_file_location(
         module_name,
