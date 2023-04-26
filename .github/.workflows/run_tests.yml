@@ -42,4 +42,4 @@ jobs:
         run: mamba install pytest-cov black pytest pytest-cov codecov -cconda-forge
 
       - name: Run the actual tests
-        run: pytest -v --color=yes --cov-report term-missing --cov=variational integrator tests
+        run: pytest -v --color=yes --cov-report term-missing --cov=variational_integrator tests
