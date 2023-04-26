@@ -1,9 +1,15 @@
+"""
+This script is testing all the examples in the biorbd examples folder to verify the integrity of the code and the main
+class VariationalIntegrator.
+"""
+
 import numpy as np
 import importlib.util
 from pathlib import Path
 
 
 def biorbd_examples_folder() -> str:
+    """return the path to the biorbd examples folder"""
     return str(Path(__file__).parent.parent / "biorbd_examples")
 
 
@@ -20,6 +26,7 @@ def load_module(path: str):
 
 
 def test_pendulum():
+    """ Test the pendulum example """
     module = load_module(biorbd_examples_folder() + "/pendulum.py")
 
     q_vi, q_vi_dot = module.pendulum(time=1, time_step=0.01)
