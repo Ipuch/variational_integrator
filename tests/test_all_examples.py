@@ -1,3 +1,8 @@
+"""
+This script is testing all the examples in the biorbd examples folder to verify the integrity of the code and the main
+class VariationalIntegrator.
+"""
+
 import numpy as np
 import importlib.util
 from pathlib import Path
