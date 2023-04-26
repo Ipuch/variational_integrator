@@ -12,6 +12,73 @@ from .enums import QuadratureRule, VariationalIntegratorType, ControlType
 class VariationalIntegrator:
     """
     This class to build a variational integrator based on the discrete Lagrangian and a first order quadrature method.
+
+    Attributes
+    ----------
+    biorbd_model: biorbd_casadi.Model
+        The biorbd model.
+    time_step: float
+        The time step of the integration.
+    time: float
+        The duration of the integration.
+    nb_steps: int
+        The number of steps of the integration.
+    constraints: Callable
+        The constraints of the system only one callable for now.
+    jac: Callable
+        The jacobian of the constraints of the system only one callable for now.
+    discrete_approximation: QuadratureRule
+        The quadrature rule used to approximate the discrete Lagrangian.
+    controls: np.ndarray
+        The controls of the system, it needs to be the size of the number of degrees of freedom.
+    control_type: ControlType
+        The type of control used.
+    forces: Callable
+        The forces of the system only one callable for now, it needs to be a function of q, qdot.
+    newton_descent_tolerance: float
+        The tolerance of the Newton descent.
+    ignore_initial_constraints: bool
+        If the initial constraints are ignored or not.
+    variational_integrator_type: VariationalIntegratorType
+        The type of variational integrator used.
+    q0_num: np.ndarray
+        The position at the first (0) time step.
+    q1_num: np.ndarray
+        The position at the second (1) time step.
+    lambda0: np.ndarray
+        The initial value of the Lagrange multipliers.
+    lambdas: MX
+        The Lagrange multipliers.
+    q_prev: MX
+        The position at the previous time step.
+    q_cur: MX
+        The position at the current time step.
+    q_next: MX
+        The position at the next time step.
+    control_prev: MX
+        The control at the previous time step.
+    control_cur: MX
+        The control at the current time step.
+    control_next: MX
+        The control at the next time step.
+    dela: Function
+        The discrete Lagrangian.
+    sym_list: list
+        The list of symbolic variables needed for the integration.
+    residuals: Function
+        The residuals of the Newton descent.
+
+    Methods
+    -------
+    lagrangian(self, q: MX | SX, qdot: MX | SX) -> MX | SX
+        Compute the Lagrangian of a biorbd model.
+    discrete_lagrangian(self, q1: MX | SX, q2: MX | SX) -> MX | SX
+        Compute the discrete Lagrangian of a biorbd model.
+    control_approximation(self, control_minus: MX | SX, control_plus: MX | SX) -> MX | SX
+        Compute the term associated to the discrete forcing. The term associated to the controls in the Lagrangian
+        equations is homogeneous to a force or a torque multiplied by a time.
+    integrate(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]
+        Integrate the discrete euler lagrange over time.
     """
 
     def __init__(
@@ -47,9 +114,9 @@ class VariationalIntegrator:
             The initial velocity of the system. q_dot_init must have the same number of rows as the number of degrees of
             freedom. It needs to have only one column.
         constraints: Callable
-            The constraints of the system only one callable for now
+            The constraints of the system only one callable for now.
         jac: Callable
-            The jacobian of the constraints of the system only one callable for now
+            The jacobian of the constraints of the system only one callable for now.
         discrete_approximation: QuadratureRule
             The quadrature rule used to approximate the discrete Lagrangian.
         controls: np.ndarray
@@ -57,7 +124,7 @@ class VariationalIntegrator:
         control_type: ControlType
             The type of control used.
         forces: Callable
-            The forces of the system only one callable for now, it needs to be a function of q, qdot
+            The forces of the system only one callable for now, it needs to be a function of q, qdot.
         newton_descent_tolerance: float
             The tolerance of the newton descent method.
         """
@@ -131,7 +198,7 @@ class VariationalIntegrator:
             except:
                 raise ValueError("The initial position does not respect the constraints.")
 
-        self.q1_num, self.q2_num, self.lambdas0 = self._compute_initial_states(q_init[:, 0], q_dot_init[:, 0])
+        self.q0_num, self.q1_num, self.lambdas0 = self._compute_initial_states(q_init[:, 0], q_dot_init[:, 0])
 
     def _compute_initial_states(self, q_init, q_dot_init):
         # Declare the MX variables
@@ -422,7 +489,7 @@ class VariationalIntegrator:
     #             f"Discrete Lagrangian {self.discrete_approximation} is not implemented"
     #         )
 
-    def compute_p_current(self, q_prev: MX | SX, q_cur: MX | SX) -> MX | SX:
+    def _compute_p_current(self, q_prev: MX | SX, q_cur: MX | SX) -> MX | SX:
         """
         Compute the current p (momentum when there is no forces)
 
@@ -469,7 +536,7 @@ class VariationalIntegrator:
         lambdas: MX | SX
             The Lagrange multipliers of second current time step
         """
-        p_current = self.compute_p_current(q_prev, q_cur)  # momentum at current time step
+        p_current = self._compute_p_current(q_prev, q_cur)  # momentum at current time step
 
         D1_Ld_qcur_qnext = transpose(jacobian(self.discrete_lagrangian(q_cur, q_next), q_cur))
         constraint_term = (
@@ -491,7 +558,7 @@ class VariationalIntegrator:
     ):
         """
         Compute the term associated to the discrete forcing. The term associated to the controls in the Lagrangian
-        equations is homo geneous to a force or a torque multiplied by a time.
+        equations is homogeneous to a force or a torque multiplied by a time.
 
         Parameters
         ----------
@@ -523,10 +590,10 @@ class VariationalIntegrator:
 
     def integrate(self):
         """
-        Integrate the discrete euler lagrange over time
+        Integrate the discrete euler lagrange over time.
         """
-        q_prev = self.q1_num
-        q_cur = self.q2_num
+        q_prev = self.q0_num
+        q_cur = self.q1_num
 
         # initialize the outputs of the integrator
         q_all = np.zeros((self.biorbd_model.nbQ(), self.nb_steps))
