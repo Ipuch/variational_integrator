@@ -20,6 +20,8 @@ class Models(Enum):
     TWO_PENDULUMS = str(UNIT_DATA / "models/two_pendulums.bioMod")
     TRIPLE_PENDULUM = str(UNIT_DATA / "models/triple_pendulum.bioMod")
     THREE_PENDULUMS = str(UNIT_DATA / "models/three_pendulums.bioMod")
+    TRIPLE_PENDULUM_WITH_COMMON_PARENT = str(UNIT_DATA / "models/triple_pendulum_with_commom_parent.bioMod")
+    QUADRUPLE_PENDULUM = str(UNIT_DATA / "models/quadruple_pendulum.bioMod")
 
 
 def forward_dynamics(biorbd_model: biorbd.Model, q: np.ndarray, qdot: np.ndarray, tau: np.ndarray) -> np.ndarray:

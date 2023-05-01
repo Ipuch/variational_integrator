@@ -633,10 +633,13 @@ class VariationalIntegrator:
             if self.constraints is not None:
                 lambdas_all[:, i - 1] = lambdas_num.toarray().squeeze()
                 q_all[:, i] = q_next.toarray().squeeze()
-                q_dot_final, lambdas_all[:, -1] = self._compute_final_velocity(q_all[:, -2], q_all[:, -1])
             else:
                 q_all[:, i] = q_next.toarray().squeeze()
-                q_dot_final = self._compute_final_velocity(q_all[:, -2], q_all[:, -1])
+
+        if self.constraints is not None:
+            q_dot_final, lambdas_all[:, -1] = self._compute_final_velocity(q_all[:, -2], q_all[:, -1])
+        else:
+            q_dot_final = self._compute_final_velocity(q_all[:, -2], q_all[:, -1])
 
         return q_all, lambdas_all, q_dot_final
 
