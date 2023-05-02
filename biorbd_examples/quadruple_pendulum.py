@@ -10,19 +10,16 @@ from biorbd_examples.utils import *
 
 
 def quadruple_pendulum(time: float = 5.0, time_step: float = 0.05):
-    """
-    """
+    """ """
     biorbd_casadi_model = biorbd_casadi.Model(Models.QUADRUPLE_PENDULUM.value)
 
     alpha = 1
-    q_t0 = np.array([alpha, - 2 * alpha, -alpha, 2 * alpha])
+    q_t0 = np.array([alpha, -2 * alpha, -alpha, 2 * alpha])
 
     # Build  constraints
     q_sym = MX.sym("q", (biorbd_casadi_model.nbQ(), 1))
     # The origin of the second pendulum is constrained to the tip of the first pendulum
-    constraint = (
-        biorbd_casadi_model.markers(q_sym)[3].to_mx() - biorbd_casadi_model.markers(q_sym)[7].to_mx()
-    )[1:]
+    constraint = (biorbd_casadi_model.markers(q_sym)[3].to_mx() - biorbd_casadi_model.markers(q_sym)[7].to_mx())[1:]
     fcn_constraint = Function("constraint", [q_sym], [constraint], ["q"], ["constraint"]).expand()
     fcn_jacobian = Function("jacobian", [q_sym], [jacobian(constraint, q_sym)], ["q"], ["jacobian"]).expand()
 
