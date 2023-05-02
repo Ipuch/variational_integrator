@@ -1,0 +1,103 @@
+version 4
+
+segment Seg0
+    translations    yz
+    rotations	x
+    ranges
+        -5 5
+        -5 5
+        -10*pi 10*pi
+    mass 1
+    inertia
+        0.0391  0.0000	0.0000
+	    0.0000	0.0335	-0.0032
+	    0.0000	-0.0032	0.0090
+    com  -0.0005 0.0688 -0.5542
+    meshfile mesh/pendulum.STL
+endsegment
+
+    // Marker 0
+    marker marker_0
+        parent Seg0
+        position 0 0 0
+    endmarker
+
+    // Marker 1
+    marker marker_1
+        parent Seg0
+        position 0 0 -1
+    endmarker
+
+    // Marker 2
+    marker CoM0
+        parent Seg0
+        position -0.0005 0.0688 -0.5542
+    endmarker
+
+segment Seg1
+    parent Seg0
+    rotations	x
+    rtinmatrix 0
+    rt 0 0 0 xyz 0 0 -1
+    ranges
+        -pi/2 pi/2
+    mass 1
+    inertia
+        0.0391  0.0000	0.0000
+	    0.0000	0.0335	-0.0032
+	    0.0000	-0.0032	0.0090
+    com  -0.0005 0.0688 -0.9542
+    meshfile mesh/pendulum.STL
+endsegment
+
+    // Marker 3
+    marker marker_3
+        parent Seg1
+        position 0 0 0
+    endmarker
+
+    // Marker 4
+    marker marker_4
+        parent Seg1
+        position 0 0 -1
+    endmarker
+
+    // Marker 5
+    marker CoM1
+        parent Seg1
+        position -0.0005 0.0688 -0.5542
+    endmarker
+
+segment Seg2
+    parent Seg0
+    rotations	x
+    rtinmatrix 0
+    rt 0 0 0 xyz 0 0 0
+    ranges
+        -pi/2 pi/2
+    mass 1
+    inertia
+        0.0391  0.0000	0.0000
+	    0.0000	0.0335	-0.0032
+	    0.0000	-0.0032	0.0090
+    com  -0.0005 0.0688 -0.9542
+    meshfile mesh/pendulum.STL
+endsegment
+
+    // Marker 6
+    marker marker_6
+        parent Seg2
+        position 0 0 0
+    endmarker
+
+    // Marker 7
+    marker marker_7
+        parent Seg2
+        position 0 0 -1
+    endmarker
+
+    // Marker 8
+    marker CoM2
+        parent Seg2
+        position -0.0005 0.0688 -0.9542
+    endmarker
