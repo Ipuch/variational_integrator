@@ -623,7 +623,11 @@ class VariationalIntegrator:
 
             # q_cur as an initial guess
             v_init = self._dispatch_to_v(q_cur, lambdas_num)
-            v_opt = ifcn(v_init)
+            try:
+                v_opt = ifcn(v_init)
+            except RuntimeError:
+                print(i)
+                break
             q_next, lambdas_num = self._dispatch_to_q_lambdas(v_opt)
 
             q_prev = q_cur
