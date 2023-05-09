@@ -148,7 +148,7 @@ class VariationalIntegrator:
             self.controls = np.zeros((self.biorbd_model.nbQ(), self.nb_steps))
         elif controls.shape[0] != self.biorbd_model.nbQ():
             raise ValueError("The control must be of the same size as the number of degrees of freedom")
-        elif controls.shape[1] != self.time / self.time_step:
+        elif controls.shape[1] != self.nb_steps:
             raise ValueError("The control must have the same number of time steps as the time of the simulation")
         else:
             self.controls = controls
