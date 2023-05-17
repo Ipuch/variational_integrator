@@ -635,24 +635,30 @@ class VariationalIntegrator:
         time_step: int
             The current time step.
         """
+        q_cur_array = np.asarray(q_cur).reshape(self.biorbd_casadi_model.nbQ())
+        q_prev_array = np.asarray(q_prev).reshape(self.biorbd_casadi_model.nbQ())
+        if lambdas_num is not None:
+            lambdas_num_array = np.asarray(lambdas_num).reshape(lambdas_num.shape[0])
+        else:
+            lambdas_num_array = None
         # The first three initial guesses are issued from https://arxiv.org/pdf/1609.02898.pdf (3.3).
         if self.initial_guess_approximation == InitialGuessApproximation.CURRENT:
-            v_init = self._dispatch_to_v(q_cur, lambdas_num)
+            v_init = self._dispatch_to_v(q_cur_array, lambdas_num_array)
         elif self.initial_guess_approximation == InitialGuessApproximation.EXPLICIT_EULER:
-            v_init = self._dispatch_to_v(2 * q_cur - q_prev, lambdas_num)
+            v_init = self._dispatch_to_v(2 * q_cur_array - q_prev_array, lambdas_num_array)
         elif self.initial_guess_approximation == InitialGuessApproximation.SEMI_IMPLICIT_EULER:
-            q_cur_array = np.asarray(q_cur).reshape(self.biorbd_casadi_model.nbQ())
             qdot_cur_array = np.asarray(2 * q_prev - q_cur).reshape(self.biorbd_casadi_model.nbQ())
             Q = u_cur
             M_inv = self.biorbd_model.massMatrixInverse(q_cur_array).to_array()
             C = self.biorbd_model.NonLinearEffect(q_cur_array, qdot_cur_array).to_array()
             qddot_cur = M_inv @ (-C + Q)
             qdot_next = 2 * q_cur - q_prev + self.time_step * qddot_cur
-            v_init = self._dispatch_to_v(q_cur + self.time_step * qdot_next, lambdas_num)
+            v_init = self._dispatch_to_v(
+                np.asarray(q_cur + self.time_step * qdot_next).reshape(self.biorbd_casadi_model.nbQ()),
+                lambdas_num_array,
+            )
         # The following initial guess is issued from http://journals.cambridge.org/abstract_S096249290100006X (2.1.1).
         elif self.initial_guess_approximation == InitialGuessApproximation.LAGRANGIAN:
-            q_cur_array = np.asarray(q_cur).reshape(self.biorbd_casadi_model.nbQ())
-            q_prev_array = np.asarray(q_prev).reshape(self.biorbd_casadi_model.nbQ())
             D2_Ld_qprev_qcur = Function(
                 "D2_Ld_qprev_qcur",
                 [self.q_prev, self.q_cur],
@@ -660,10 +666,10 @@ class VariationalIntegrator:
             ).expand()
             pk = D2_Ld_qprev_qcur(q_prev_array, q_cur_array)
             M_inv = self.biorbd_model.massMatrixInverse(q_cur_array).to_array()
-            v_init = self._dispatch_to_v(q_cur + M_inv @ pk * self.time_step, lambdas_num)
+            v_init = self._dispatch_to_v(np.asarray(q_cur + M_inv @ pk * self.time_step), lambdas_num_array)
         # It is also possible to give an array of initial guesses.
         elif self.initial_guess_approximation == InitialGuessApproximation.CUSTOM:
-            v_init = self._dispatch_to_v(self.initial_guess_custom[:, time_step], lambdas_num)
+            v_init = self._dispatch_to_v(self.initial_guess_custom[:, time_step], lambdas_num_array)
         else:
             raise NotImplementedError(f"Initial guess {self.initial_guess_approximation} is not implemented yet.")
         return v_init
