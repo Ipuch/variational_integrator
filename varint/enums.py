@@ -30,3 +30,15 @@ class ControlType(Enum):
 
     PIECEWISE_CONSTANT = "piecewise_constant"
     PIECEWISE_LINEAR = "piecewise_linear"
+
+
+class InitialGuessApproximation(Enum):
+    """
+    The different initial guess approximations available for the Newton's method
+    """
+
+    LAGRANGIAN = "lagrangian"
+    CURRENT = "current"
+    EXPLICIT_EULER = "explicit_euler"
+    SEMI_IMPLICIT_EULER = "semi_implicit_euler"
+    CUSTOM = "custom"

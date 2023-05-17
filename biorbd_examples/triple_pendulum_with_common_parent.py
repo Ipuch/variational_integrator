@@ -36,8 +36,8 @@ def triple_pendulum(time: float = 5, time_step: float = 0.05):
 
     # variational integrator
     vi = VariationalIntegrator(
-        biorbd_model=biorbd_casadi_model,
-        time_step=time_step,
+        biorbd_casadi_model=biorbd_casadi_model,
+        nb_steps=int(time / time_step),
         time=time,
         constraints=fcn_constraint,
         jac=fcn_jacobian,
