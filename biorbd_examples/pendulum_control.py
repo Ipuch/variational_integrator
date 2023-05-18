@@ -102,7 +102,7 @@ def pendulum(
 
     # variational integrator
     vi = VariationalIntegrator(
-        biorbd_casadi_model=biorbd_casadi_model,
+        biorbd_model=biorbd_casadi_model,
         nb_steps=30,
         time=time,
         q_init=np.array([[q_optimal_control[0]]]),

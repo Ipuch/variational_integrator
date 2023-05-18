@@ -16,7 +16,7 @@ class VariationalIntegrator:
 
     Attributes
     ----------
-    biorbd_casadi_model: biorbd_casadi.Model
+    biorbd_model: biorbd_casadi.Model
         The biorbd model.
     nb_steps: int
         The number of steps of the integration.
@@ -84,7 +84,7 @@ class VariationalIntegrator:
 
     def __init__(
         self,
-        biorbd_casadi_model: biorbd_casadi.Model,
+        biorbd_model: biorbd_casadi.Model,
         nb_steps: int,
         time: float,
         q_init: np.ndarray,
@@ -100,11 +100,12 @@ class VariationalIntegrator:
         ignore_initial_constraints=False,
         initial_guess_approximation: InitialGuessApproximation = InitialGuessApproximation.CURRENT,
         initial_guess_custom: np.ndarray = None,
+        debug_mode: bool = False,
     ):
         """
         Parameters
         ----------
-        biorbd_casadi_model: biorbd_casadi.Model
+        biorbd_model: biorbd_casadi.Model
             The biorbd model.
         nb_steps: int
             The number of steps of the integration.
@@ -141,7 +142,8 @@ class VariationalIntegrator:
         if control_type not in ControlType:
             raise NotImplementedError(f"Control {control_type} is not implemented")
 
-        self.biorbd_casadi_model = biorbd_casadi_model
+        self.biorbd_model = biorbd_model
+        self.biorbd_numpy_model = biorbd.Model(biorbd_model.path().absolutePath().to_string())
         self.time = time
         self.nb_steps = nb_steps
         self.time_step = time / nb_steps
@@ -151,27 +153,22 @@ class VariationalIntegrator:
         self.discrete_approximation = discrete_approximation
         self.control_type = control_type
         self.initial_guess_approximation = initial_guess_approximation
-        if (
-            initial_guess_approximation == InitialGuessApproximation.SEMI_IMPLICIT_EULER
-            or initial_guess_approximation == InitialGuessApproximation.LAGRANGIAN
-        ):
-            self.biorbd_model = biorbd.Model(biorbd_casadi_model.path().absolutePath().to_string())
         if initial_guess_approximation == InitialGuessApproximation.CUSTOM:
             if initial_guess_custom is None:
                 raise ValueError("The initial guess is set to CUSTOM but no initial guess was given.")
-            if initial_guess_custom.shape != (self.biorbd_casadi_model.nbQ(), self.nb_steps):
+            if initial_guess_custom.shape != (self.biorbd_model.nbQ(), self.nb_steps):
                 raise ValueError(
                     f"The initial guess must be of the same size as the number of degrees of freedom "
                     f"and the number of time steps. The initial guess's shape is "
-                    f"{initial_guess_custom.shape} and it should be ({self.biorbd_casadi_model.nbQ()}, "
+                    f"{initial_guess_custom.shape} and it should be ({self.biorbd_model.nbQ()}, "
                     f"{self.nb_steps})"
                 )
 
         self.initial_guess_custom = initial_guess_custom
 
         if controls is None:
-            self.controls = np.zeros((self.biorbd_casadi_model.nbQ(), self.nb_steps))
-        elif controls.shape[0] != self.biorbd_casadi_model.nbQ():
+            self.controls = np.zeros((self.biorbd_model.nbQ(), self.nb_steps))
+        elif controls.shape[0] != self.biorbd_model.nbQ():
             raise ValueError("The control must be of the same size as the number of degrees of freedom")
         elif controls.shape[1] != self.nb_steps:
             raise ValueError(
@@ -198,17 +195,18 @@ class VariationalIntegrator:
         # self.force_approximation = force_approximation
 
         if jac is None:
-            q_sym = MX.sym("q", (biorbd_casadi_model.nbQ(), 1))
+            q_sym = MX.sym("q", (biorbd_model.nbQ(), 1))
             self.jac = Function("no_constraint", [q_sym], [MX.zeros(q_init.shape)], ["q"], ["zero"]).expand()
 
         self._declare_mx()
         self._declare_discrete_euler_lagrange_equations()
         self.newton_descent_tolerance = newton_descent_tolerance
+        self.debug_mode = debug_mode
 
         # check q_init
-        if q_init.shape[0] != biorbd_casadi_model.nbQ():
+        if q_init.shape[0] != biorbd_model.nbQ():
             raise ValueError("q_init must have the same number of rows as the number of degrees of freedom")
-        if q_dot_init.shape[0] != biorbd_casadi_model.nbQ():
+        if q_dot_init.shape[0] != biorbd_model.nbQ():
             raise ValueError("q_dot_init must have the same number of rows as the number of degrees of freedom")
         if q_init.shape[1] != 1:
             raise ValueError("If an initial velocity is given (q_dot_init), q_init must have one columns (q0)")
@@ -226,14 +224,33 @@ class VariationalIntegrator:
             except:
                 raise ValueError("The initial position does not respect the constraints.")
 
-        self.q0_num, self.q1_num, self.lambdas_0 = self._compute_initial_states(q_init[:, 0], q_dot_init[:, 0])
+        self.q0_num, self.q1_num, self.lambdas_0 = self._compute_initial_states(q_init.squeeze(), q_dot_init.squeeze())
 
     def _compute_initial_states(self, q_init, q_dot_init):
+        """
+        Compute the initial states of the system from the initial position and velocity.
+
+        Parameters
+        ----------
+        q_init: np.ndarray
+            The initial position of the system.
+        q_dot_init: np.ndarray
+            The initial velocity of the system.
+
+        Returns
+        -------
+        q0: DM
+            The initial position of the system.
+        q1: DM
+            The initial velocity of the system.
+        lambdas0: DM | None
+            The initial lagrange multipliers of the system if there are constraints, None otherwise.
+        """
         # Declare the MX variables
-        q0 = MX.sym("q0", self.biorbd_casadi_model.nbQ(), 1)
-        q0_dot = MX.sym("q0_dot", self.biorbd_casadi_model.nbQ(), 1)
-        q1 = MX.sym("q1", self.biorbd_casadi_model.nbQ(), 1)
-        f0_minus = MX.sym("f0_minus", self.biorbd_casadi_model.nbQ(), 1)
+        q0 = MX.sym("q0", self.biorbd_model.nbQ(), 1)
+        q0_dot = MX.sym("q0_dot", self.biorbd_model.nbQ(), 1)
+        q1 = MX.sym("q1", self.biorbd_model.nbQ(), 1)
+        f0_minus = MX.sym("f0_minus", self.biorbd_model.nbQ(), 1)
 
         # The following equation as been calculated thanks to the paper "Discrete mechanics and optimal control for
         # constrained systems" (https://onlinelibrary.wiley.com/doi/epdf/10.1002/oca.912), equations (14) and the
@@ -244,7 +261,7 @@ class VariationalIntegrator:
         constraint_term = (
             1 / 2 * transpose(self.jac(q0)) @ self.lambdas
             if self.constraints is not None
-            else MX.zeros(self.biorbd_casadi_model.nbQ(), 1)
+            else MX.zeros(self.biorbd_model.nbQ(), 1)
         )
         output = [D2_L_q0_q0dot + D1_Ld_q0_q1 + f0_minus - constraint_term]
 
@@ -282,17 +299,31 @@ class VariationalIntegrator:
         v_opt = ifcn(v_init)
         q1_opt, lambdas_0_opt = self._dispatch_to_q_lambdas(v_opt)
 
-        if self.constraints is not None:
-            return DM(q_init), DM(np.asarray(q1_opt)[:, 0]), np.asarray(lambdas_0_opt)[:, 0]
-        else:
-            return DM(q_init), DM(np.asarray(q1_opt)[:, 0]), None
+        return DM(q_init), q1_opt, lambdas_0_opt
 
     def _compute_final_velocity(self, q_penultimate, q_ultimate):
+        """
+        Compute the final velocity of the system from the initial position and velocity.
+
+        Parameters
+        ----------
+        q_penultimate: np.ndarray
+            The penultimate position of the system.
+        q_ultimate: np.ndarray
+            The ultimate position of the system.
+
+        Returns
+        -------
+        qN_dot: DM
+            The final velocity of the system.
+        lambdasN: DM
+            The final lagrange multipliers of the system.
+        """
         # Declare the MX variables
-        qN = MX.sym("qN", self.biorbd_casadi_model.nbQ(), 1)
-        qN_dot = MX.sym("qN_dot", self.biorbd_casadi_model.nbQ(), 1)
-        qN_minus_1 = MX.sym("qN_minus_1", self.biorbd_casadi_model.nbQ(), 1)
-        fd_plus = MX.sym("fd_plus", self.biorbd_casadi_model.nbQ(), 1)
+        qN = MX.sym("qN", self.biorbd_model.nbQ(), 1)
+        qN_dot = MX.sym("qN_dot", self.biorbd_model.nbQ(), 1)
+        qN_minus_1 = MX.sym("qN_minus_1", self.biorbd_model.nbQ(), 1)
+        fd_plus = MX.sym("fd_plus", self.biorbd_model.nbQ(), 1)
 
         # The following equation as been calculated thanks to the paper "Discrete mechanics and optimal control for
         # constrained systems" (https://onlinelibrary.wiley.com/doi/epdf/10.1002/oca.912), equations (14) and the
@@ -303,7 +334,7 @@ class VariationalIntegrator:
         constraint_term = (
             1 / 2 * transpose(self.jac(qN)) @ self.lambdas
             if self.constraints is not None
-            else MX.zeros(self.biorbd_casadi_model.nbQ(), 1)
+            else MX.zeros(self.biorbd_model.nbQ(), 1)
         )
         output = [-D2_L_qN_qN_dot + D2_Ld_qN_minus_1_qN - constraint_term + fd_plus]
 
@@ -345,28 +376,25 @@ class VariationalIntegrator:
         v_opt = ifcn(v_init)
         qN_dot_opt, lambdasN_opt = self._dispatch_to_q_lambdas(v_opt)
 
-        if self.constraints is not None:
-            return np.asarray(qN_dot_opt)[:, 0], np.asarray(lambdasN_opt)[:, 0]
-        else:
-            return np.asarray(qN_dot_opt)[:, 0]
+        return qN_dot_opt, lambdasN_opt
 
     def _declare_mx(self):
         """
         Declare the MX variables
         """
         # declare q for each time step of the integration
-        self.q_prev = MX.sym("q_prev", self.biorbd_casadi_model.nbQ(), 1)  # ti-1
-        self.q_cur = MX.sym("q_cur", self.biorbd_casadi_model.nbQ(), 1)  # ti
-        self.q_next = MX.sym("q_next", self.biorbd_casadi_model.nbQ(), 1)  # ti+1
+        self.q_prev = MX.sym("q_prev", self.biorbd_model.nbQ(), 1)  # ti-1
+        self.q_cur = MX.sym("q_cur", self.biorbd_model.nbQ(), 1)  # ti
+        self.q_next = MX.sym("q_next", self.biorbd_model.nbQ(), 1)  # ti+1
         # declare lambda for each constraint
         if self.constraints is not None:
             self.lambdas = MX.sym("lambda", self.constraints.nnz_out(), 1)
         else:
             self.lambdas = MX.sym("lambda", (0, 0))
 
-        self.control_prev = MX.sym("control_prev", self.biorbd_casadi_model.nbQ(), 1)
-        self.control_cur = MX.sym("control_cur", self.biorbd_casadi_model.nbQ(), 1)
-        self.control_next = MX.sym("control_next", self.biorbd_casadi_model.nbQ(), 1)
+        self.control_prev = MX.sym("control_prev", self.biorbd_model.nbQ(), 1)
+        self.control_cur = MX.sym("control_cur", self.biorbd_model.nbQ(), 1)
+        self.control_next = MX.sym("control_next", self.biorbd_model.nbQ(), 1)
 
     def _declare_discrete_euler_lagrange_equations(self):
         """
@@ -441,10 +469,7 @@ class VariationalIntegrator:
         The Lagrangian
         """
 
-        return (
-            self.biorbd_casadi_model.KineticEnergy(q, qdot).to_mx()
-            - self.biorbd_casadi_model.PotentialEnergy(q).to_mx()
-        )
+        return self.biorbd_model.KineticEnergy(q, qdot).to_mx() - self.biorbd_model.PotentialEnergy(q).to_mx()
 
     def discrete_lagrangian(self, q1: MX | SX, q2: MX | SX) -> MX | SX:
         """
@@ -618,7 +643,7 @@ class VariationalIntegrator:
                     f"Discrete {self.discrete_approximation} is not implemented for {self.control_type}"
                 )
 
-    def _compute_initial_guess(self, q_prev, q_cur, u_cur, lambdas_num, time_step):
+    def _compute_initial_guess(self, q_prev, q_cur, u_cur, time_step):
         """
         Compute the initial guess for the next time step.
 
@@ -628,35 +653,32 @@ class VariationalIntegrator:
             The coordinates at the previous time step.
         q_cur: DM
             The coordinates at the current time step.
-        u_cur: DM
+        u_cur: np.ndarray
             The controls at the current time step.
-        lambdas_num: DM
-            The Lagrange multipliers at the current time step.
         time_step: int
             The current time step.
+
+        Returns
+        -------
+        q_guess: DM
+            The initial guess for the next time step.
         """
-        q_cur_array = np.asarray(q_cur).reshape(self.biorbd_casadi_model.nbQ())
-        q_prev_array = np.asarray(q_prev).reshape(self.biorbd_casadi_model.nbQ())
-        if lambdas_num is not None:
-            lambdas_num_array = np.asarray(lambdas_num).reshape(lambdas_num.shape[0])
-        else:
-            lambdas_num_array = None
+        q_cur_array = q_cur.toarray().squeeze()
+        q_prev_array = q_prev.toarray().squeeze()
         # The first three initial guesses are issued from https://arxiv.org/pdf/1609.02898.pdf (3.3).
         if self.initial_guess_approximation == InitialGuessApproximation.CURRENT:
-            v_init = self._dispatch_to_v(q_cur_array, lambdas_num_array)
+            q_guess = q_cur_array
         elif self.initial_guess_approximation == InitialGuessApproximation.EXPLICIT_EULER:
-            v_init = self._dispatch_to_v(2 * q_cur_array - q_prev_array, lambdas_num_array)
+            qdot_cur_array = 1 / self.time_step * (q_cur_array - q_prev_array)
+            q_guess = q_cur_array + self.time_step * qdot_cur_array
         elif self.initial_guess_approximation == InitialGuessApproximation.SEMI_IMPLICIT_EULER:
-            qdot_cur_array = np.asarray(2 * q_prev - q_cur).reshape(self.biorbd_casadi_model.nbQ())
-            Q = u_cur
-            M_inv = self.biorbd_model.massMatrixInverse(q_cur_array).to_array()
-            C = self.biorbd_model.NonLinearEffect(q_cur_array, qdot_cur_array).to_array()
-            qddot_cur = M_inv @ (-C + Q)
-            qdot_next = 2 * q_cur - q_prev + self.time_step * qddot_cur
-            v_init = self._dispatch_to_v(
-                np.asarray(q_cur + self.time_step * qdot_next).reshape(self.biorbd_casadi_model.nbQ()),
-                lambdas_num_array,
-            )
+            qdot_cur_array = 1 / self.time_step * (q_cur_array - q_prev_array)
+            u_cur_array = u_cur
+            qddot_cur_array = self.biorbd_numpy_model.ForwardDynamics(
+                q_cur_array, qdot_cur_array, u_cur_array
+            ).to_array()
+            qdot_next_array = qdot_cur_array + self.time_step * qddot_cur_array
+            q_guess = q_cur_array + self.time_step * qdot_next_array
         # The following initial guess is issued from http://journals.cambridge.org/abstract_S096249290100006X (2.1.1).
         elif self.initial_guess_approximation == InitialGuessApproximation.LAGRANGIAN:
             D2_Ld_qprev_qcur = Function(
@@ -665,14 +687,14 @@ class VariationalIntegrator:
                 [transpose(jacobian(self.discrete_lagrangian(self.q_prev, self.q_cur), self.q_cur))],
             ).expand()
             pk = D2_Ld_qprev_qcur(q_prev_array, q_cur_array)
-            M_inv = self.biorbd_model.massMatrixInverse(q_cur_array).to_array()
-            v_init = self._dispatch_to_v(np.asarray(q_cur + M_inv @ pk * self.time_step), lambdas_num_array)
+            M_inv = self.biorbd_numpy_model.massMatrixInverse(q_cur_array).to_array()
+            q_guess = q_cur + (M_inv @ pk * self.time_step).toarray()
         # It is also possible to give an array of initial guesses.
         elif self.initial_guess_approximation == InitialGuessApproximation.CUSTOM:
-            v_init = self._dispatch_to_v(self.initial_guess_custom[:, time_step], lambdas_num_array)
+            q_guess = self.initial_guess_custom[:, time_step]
         else:
             raise NotImplementedError(f"Initial guess {self.initial_guess_approximation} is not implemented yet.")
-        return v_init
+        return DM(q_guess)
 
     def integrate(self):
         """
@@ -682,17 +704,17 @@ class VariationalIntegrator:
         q_cur = self.q1_num
 
         # initialize the outputs of the integrator
-        q_all = np.zeros((self.biorbd_casadi_model.nbQ(), self.nb_steps))
-        q_all[:, 0] = np.asarray(q_prev)[:, 0]
-        q_all[:, 1] = np.asarray(q_prev)[:, 0]
+        q_all = np.zeros((self.biorbd_model.nbQ(), self.nb_steps))
+        q_all[:, 0] = q_prev.toarray().squeeze()
+        q_all[:, 1] = q_cur.toarray().squeeze()
 
         if self.constraints is not None:
             lambdas_all = np.zeros((self.constraints.nnz_out(), self.nb_steps))
-            lambdas_all[:, 0] = self.lambdas_0
-            lambdas_num = lambdas_all[:, 0]
+            lambdas_all[:, 0] = self.lambdas_0.toarray().squeeze()
+            lambdas_num = DM(lambdas_all[:, 0])
         else:
             lambdas_all = None
-            lambdas_num = np.zeros((0, self.nb_steps))
+            lambdas_num = DM(np.zeros((0, self.nb_steps)))
 
         for i in range(2, self.nb_steps):
             if self.controls is not None:
@@ -707,12 +729,17 @@ class VariationalIntegrator:
             # f(q_prev, q_cur, q_next) = 0, only q_next is unknown
             ifcn = self._declare_residuals(q_prev, q_cur, control_prev=u_prev, control_cur=u_cur, control_next=u_next)
 
-            v_init = self._compute_initial_guess(q_prev, q_cur, u_cur, lambdas_num, i)
-            try:
+            q_guess = self._compute_initial_guess(q_prev, q_cur, u_cur, i)
+
+            v_init = self._dispatch_to_v(q_guess, lambdas_num)
+            if self.debug_mode:
+                try:
+                    v_opt = ifcn(v_init)
+                except RuntimeError:
+                    print(f"The integration crashed at the {i}th time step because of the rootfinding.")
+                    break
+            else:
                 v_opt = ifcn(v_init)
-            except RuntimeError:
-                print(f"The integration crashed at the {i}th time step because of the rootfinding.")
-                break
             q_next, lambdas_num = self._dispatch_to_q_lambdas(v_opt)
 
             q_prev = q_cur
@@ -725,14 +752,14 @@ class VariationalIntegrator:
             else:
                 q_all[:, i] = q_next.toarray().squeeze()
 
+        q_dot_final, lambda_final = self._compute_final_velocity(q_all[:, -2], q_all[:, -1])
+
         if self.constraints is not None:
-            q_dot_final, lambdas_all[:, -1] = self._compute_final_velocity(q_all[:, -2], q_all[:, -1])
-        else:
-            q_dot_final = self._compute_final_velocity(q_all[:, -2], q_all[:, -1])
+            lambdas_all[:, -1] = lambda_final.toarray().squeeze()
 
-        return q_all, lambdas_all, q_dot_final
+        return q_all, lambdas_all, q_dot_final.toarray().squeeze()
 
-    def _dispatch_to_v(self, q: np.ndarray, lambdas: np.ndarray) -> np.ndarray:
+    def _dispatch_to_v(self, q: np.ndarray | DM, lambdas: np.ndarray | DM) -> np.ndarray | DM:
         """
         Dispatch the q and lambdas to the correct format
 
@@ -748,7 +775,7 @@ class VariationalIntegrator:
             v = np.concatenate((v, lambdas), axis=0)
         return v
 
-    def _dispatch_to_q_lambdas(self, v: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def _dispatch_to_q_lambdas(self, v: np.ndarray | DM) -> Tuple[np.ndarray | DM, np.ndarray | DM]:
         """
         Dispatch the v to the correct format
 
@@ -757,9 +784,9 @@ class VariationalIntegrator:
         v: np.ndarray
             The generalized coordinates and Lagrange multipliers
         """
-        q = v[: self.biorbd_casadi_model.nbQ()]
+        q = v[: self.biorbd_model.nbQ()]
         if self.constraints is not None:
-            lambdas = v[self.biorbd_casadi_model.nbQ() :]
+            lambdas = v[self.biorbd_model.nbQ() :]
         else:
             lambdas = None
         return q, lambdas

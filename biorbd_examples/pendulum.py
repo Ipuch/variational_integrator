@@ -34,7 +34,7 @@ def pendulum(time: float = 600, time_step: float = 0.01, unit_test: bool = False
 
     # variational integrator
     vi = VariationalIntegrator(
-        biorbd_casadi_model=biorbd_casadi_model,
+        biorbd_model=biorbd_casadi_model,
         nb_steps=int(time / time_step),
         time=time,
         q_init=np.array([[q0]]),

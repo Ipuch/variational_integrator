@@ -35,7 +35,7 @@ def double_pendulum(time: float = 1, time_step: float = 0.05, unit_test: bool = 
 
     # variational integrator
     vi = VariationalIntegrator(
-        biorbd_casadi_model=biorbd_casadi_model,
+        biorbd_model=biorbd_casadi_model,
         nb_steps=int(time / time_step),
         time=time,
         q_init=q0,

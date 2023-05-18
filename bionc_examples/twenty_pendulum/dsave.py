@@ -19,13 +19,13 @@ from sim import StandardSim
 from variational_integrator import VariationalIntegrator, QuadratureRule
 
 
-# def forward_dynamics(biorbd_model: biorbd.Model, q: np.ndarray, qdot: np.ndarray, tau: np.ndarray) -> np.ndarray:
+# def forward_dynamics(biorbd_numpy_model: biorbd.Model, q: np.ndarray, qdot: np.ndarray, tau: np.ndarray) -> np.ndarray:
 #     """
 #     Forward dynamics of a biorbd model
 #
 #     Parameters
 #     ----------
-#     biorbd_model: biorbd.Model
+#     biorbd_numpy_model: biorbd.Model
 #         The biorbd model
 #     q: np.ndarray
 #         The generalized coordinates
@@ -39,18 +39,18 @@ from variational_integrator import VariationalIntegrator, QuadratureRule
 #     The generalized accelerations
 #     """
 #
-#     return np.concatenate((qdot, biorbd_model.ForwardDynamics(q, qdot, tau).to_array()))
+#     return np.concatenate((qdot, biorbd_numpy_model.ForwardDynamics(q, qdot, tau).to_array()))
 #
 #
 #
 #
-# def total_energy(biorbd_model: biorbd.Model, q: np.ndarray, qdot: np.ndarray) -> np.ndarray:
+# def total_energy(biorbd_numpy_model: biorbd.Model, q: np.ndarray, qdot: np.ndarray) -> np.ndarray:
 #     """
 #     Compute the total energy of a biorbd model
 #
 #     Parameters
 #     ----------
-#     biorbd_model: biorbd.Model
+#     biorbd_numpy_model: biorbd.Model
 #         The biorbd model
 #     q: np.ndarray
 #         The generalized coordinates
@@ -63,18 +63,18 @@ from variational_integrator import VariationalIntegrator, QuadratureRule
 #     """
 #     H = np.zeros((q.shape[0]))
 #     for i in range(q.shape[0]):
-#         H[i] = total_energy_i(biorbd_model, q[i : i + 1], qdot[i : i + 1])
+#         H[i] = total_energy_i(biorbd_numpy_model, q[i : i + 1], qdot[i : i + 1])
 #
 #     return H
 #
 #
-# def discrete_total_energy_i(biorbd_model: biorbd.Model, q1: np.ndarray, q2: np.ndarray, time_step) -> np.ndarray:
+# def discrete_total_energy_i(biorbd_numpy_model: biorbd.Model, q1: np.ndarray, q2: np.ndarray, time_step) -> np.ndarray:
 #     """
 #     Compute the discrete total energy of a biorbd model
 #
 #     Parameters
 #     ----------
-#     biorbd_model: biorbd.Model
+#     biorbd_numpy_model: biorbd.Model
 #         The biorbd model
 #     q1: np.ndarray
 #         The generalized coordinates at the first time step
@@ -89,7 +89,7 @@ from variational_integrator import VariationalIntegrator, QuadratureRule
 #     """
 #     q_middle = (q1 + q2) / 2
 #     qdot_middle = (q2 - q1) / time_step
-#     return total_energy_i(biorbd_model, np.array(q_middle), np.array(qdot_middle))
+#     return total_energy_i(biorbd_numpy_model, np.array(q_middle), np.array(qdot_middle))
 #
 #
 def discrete_total_energy(biomodel: bionc.BiomechanicalModel, q: np.ndarray, time_step) -> np.ndarray:
@@ -98,7 +98,7 @@ def discrete_total_energy(biomodel: bionc.BiomechanicalModel, q: np.ndarray, tim
 
     Parameters
     ----------
-    biorbd_model: biorbd.Model
+    biorbd_numpy_model: biorbd.Model
         The biorbd model
     q: np.ndarray
         The generalized coordinates

@@ -201,7 +201,7 @@ if __name__ == "__main__":
     ]:
         print(initial_guess_approximation)
         vi = VariationalIntegrator(
-            biorbd_casadi_model=biorbd_casadi_model,
+            biorbd_model=biorbd_casadi_model,
             nb_steps=229,
             time=time[229],
             q_init=q[:, 0][:, np.newaxis],
@@ -210,6 +210,7 @@ if __name__ == "__main__":
             discrete_approximation=QuadratureRule.TRAPEZOIDAL,
             initial_guess_approximation=initial_guess_approximation,
             initial_guess_custom=q[:, :229],
+            debug_mode=True,
         )
 
         q_vi, *_ = vi.integrate()
