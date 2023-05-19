@@ -96,14 +96,14 @@ def pendulum(
     import time as t
 
     time = 1
-    time_step = 1 / 30
+    nb_steps = 30
 
     tic0 = t.time()
 
     # variational integrator
     vi = VariationalIntegrator(
         biorbd_model=biorbd_casadi_model,
-        time_step=time_step,
+        nb_steps=30,
         time=time,
         q_init=np.array([[q_optimal_control[0]]]),
         q_dot_init=np.array([[0]]),

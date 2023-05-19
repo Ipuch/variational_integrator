@@ -1,0 +1,381 @@
+version	1
+
+// General informations
+root_actuated 0
+external_forces 0
+
+// Informations about Pelvis segment
+	// Segment
+	segment	Pelvis
+		translations	xyz
+		rotations	xyz
+		RT
+			1    0    0	0.0000000000
+			0    1    0	0.0000000000
+			0    0    1     0.0000000000
+			0.0000000000	0.0000000000	0.0000000000	1.0000000000
+		mass	0.0001
+		inertia
+			0.0001	0.0000000000	0.0000000000
+			0.0000000000	0.0001	0.0000000000
+			0.0000000000	0.0000000000	0.0001
+		com		0.0000000000		0.0000000000		0.0000000000
+		meshfile mesh/pelvis.stl
+	endsegment
+
+	// Markers
+		marker	base_pelvis
+			parent	Pelvis
+			position	0	0	0
+			technical 1
+		endmarker
+		marker	top_tete
+			parent	Pelvis
+			position	0	0	0.788
+			technical 1
+		endmarker
+
+// Informations about Thorax segment
+	// Segment
+	segment	Thorax
+		parent	Pelvis
+		rotations	xyz
+		RT
+			1	0	0	-0.0105445918
+			0	1	0	-0.0594876700
+			0	00	1	0.2160444777
+			0.0000000000	0.0000000000	0.0000000000	1.0000000000
+		mass	20.3888
+		inertia
+			0.4918	0.0000000000	0.0000000000
+			0.0000000000	0.5645	0.0000000000
+			0.0000000000	0.0000000000	0.2255
+		com		0         0    0.1760
+	    meshfile mesh/thorax.stl
+
+	endsegment
+
+
+// Informations about Tete segment
+	// Segment
+	segment	Tete
+		parent	Thorax
+		RT
+			1	0	0	-0.0014793674
+			0	1	0	-0.0066127196
+			0	0	1	0.2994318521
+			0.0000000000	0.0000000000	0.0000000000	1.0000000000
+		mass	5.9721
+		inertia
+			0.0974  	0.0000000000	0.0000000000
+			0.0000000000	0.0974	0.0000000000
+			0.0000000000	0.0000000000	0.0203
+		com		0         0    0.1182
+	    meshfile mesh/tete.stl
+
+	endsegment
+
+
+// Informations about EpauleD segment
+	// Segment
+	segment	EpauleD
+		parent	Thorax
+		RT
+			0.9926071942	0.0960671994	0.0741758111	0.0323399606
+			-0.0905310952	0.9930877165	-0.0747054765	0.0167688444
+			-0.0808398328	0.0674379760	0.9944430807	0.1699134093
+			0.0000000000	0.0000000000	0.0000000000	1.0000000000
+		mass	0.6007
+		inertia
+			0	0	0
+			0	0	0
+			0	0	0
+		com		0.1003         0         0
+	endsegment
+
+// Informations about BrasD segment
+	// Segment
+	segment	BrasD
+		parent	EpauleD
+		rotations	zy
+		RT
+			0.7407461168	-0.6039532562	-0.2941694317	0.1612546624
+			0.6178599746	0.7843909783	-0.0545879575	-0.0000019510
+			0.2637124230	-0.1413197002	0.9541931147	0.0000024963
+			0.0000000000	0.0000000000	0.0000000000	1.0000000000
+		mass	2.2471
+		inertia
+			0.0134 	0.0000000000	0.0000000000
+			0.0000000000	0.0134	0.0000000000
+			0.0000000000	0.0000000000	0.0031
+		com		0         0    -0.1214
+	    meshfile mesh/bras.stl
+
+	endsegment
+
+	// Markers
+		marker	base_brasD
+			parent	BrasD
+			position	0	0	0
+			technical 1
+		endmarker
+		marker	top_brasD
+			parent	BrasD
+			position	0	0	-0.26
+			technical 1
+		endmarker
+
+// Informations about ABrasD segment
+	// Segment
+	segment	ABrasD
+		parent	BrasD
+		RT
+			1	0	0	0.0000006432
+			0	1	0	0.0000007417
+			0	0	1	-0.2929873739
+			0	0	0	1
+		mass	1.2921
+		inertia
+			0.0064	0.0000000000	0.0000000000
+			0.0000000000	0.0065	0.0000000000
+			0.0000000000	0.0000000000	0.0010
+		com		0         0    -0.1248
+	    meshfile mesh/avantbras.stl
+	endsegment
+
+	// Markers
+		marker	base_AbrasD
+			parent	ABrasD
+			position	0	0	0
+			technical 1
+		endmarker
+		marker	top_AbrasD
+			parent	ABrasD
+			position	0	0	-0.4245
+			technical 1
+		endmarker
+
+// Informations about MainD segment
+	// Segment
+	segment	MainD
+		parent	ABrasD
+		RT
+			1	0	0	0.0000003366
+			0	1	0	0.0000005075
+			0	0	1	-0.2540782785
+			0.0000000000	0.0000000000	0.0000000000	1.0000000000
+		mass	0.5275
+		inertia
+			0.0023 	0.0000000000	0.0000000000
+			0.0000000000	0.0025 	0.0000000000
+			0.0000000000	0.0000000000	0.0003
+		com		0.0255838836	-0.0346156093	-0.0344497047
+		meshfile mesh/main.stl
+	endsegment
+
+	// Markers
+		marker	MidMainD
+			parent	MainD
+			position	0	0	-0.1
+			technical 1
+		endmarker
+
+
+// Informations about EpauleG segment
+	// Segment
+	segment	EpauleG
+		parent	Thorax
+		RT
+			0.9840921936	-0.1440107224	-0.1040358888	-0.0284824291
+			0.1366368693	0.9877881205	-0.0748665146	0.0276167488
+			0.1135469960	0.0594604144	0.9917517526	0.1667404889
+			0.0000000000	0.0000000000	0.0000000000	1.0000000000
+		mass	0.6007
+		inertia
+			0.0000000000	0.0000000000	0.0000000000
+			0.0000000000	0.0000000000	0.0000000000
+			0.0000000000	0.0000000000	0.0000000000
+		com		-0.1003         0         0
+	endsegment
+
+
+// Informations about BrasG segment
+	// Segment
+	segment	BrasG
+		parent	EpauleG
+		rotations	zy
+		RT
+			0.7822185856	0.5693963449	0.2528277810	-0.1671338270
+			-0.5693349884	0.8181046273	-0.0810091957	-0.0000077493
+			-0.2529659173	-0.0805768033	0.9641139058	0.0000038505
+			0.0000000000	0.0000000000	0.0000000000	1.0000000000
+		mass	2.2471
+		inertia
+			0.0134 	0.0000000000	0.0000000000
+			0.0000000000	0.0134 	0.0000000000
+			0.0000000000	0.0000000000	0.0031
+		com		0         0    -0.1214
+	    meshfile mesh/bras.stl
+	endsegment
+
+	// Markers
+		marker	base_brasG
+			parent	BrasG
+			position	0	0	0
+			technical 1
+		endmarker
+		marker	top_brasG
+			parent	BrasG
+			position	0	0	-0.26
+			technical 1
+		endmarker
+
+// Informations about ABrasG segment
+	// Segment
+	segment	ABrasG
+		parent	BrasG
+		RT
+			1	0	0	0.0000008108
+			0	1	0	0.0000069167
+			0	0	1	-0.2885936396
+			0	0	0	1
+		mass	1.2921
+		inertia
+			0.0064 	0.0000000000	0.0000000000
+			0.0000000000	0.0065	0.0000000000
+			0.0000000000	0.0000000000	0.0010
+		com		0         0    -0.1248
+	    meshfile mesh/avantbras.stl
+	endsegment
+
+	// Markers
+		marker	base_AbrasG
+			parent	ABrasG
+			position	0	0	0
+			technical 1
+		endmarker
+		marker	top_AbrasG
+			parent	ABrasG
+			position	0	0	-0.4245
+			technical 1
+		endmarker
+
+
+// Informations about MainG segment
+	// Segment
+	segment	MainG
+		parent	ABrasG
+		RT
+			1	0	0	0.0000003366
+			0	1	0	0.0000005075
+			0	0	1	-0.2540782785
+			0.0000000000	0.0000000000	0.0000000000	1.0000000000
+		mass	0.5275
+		inertia
+			0.0023 	0.0000000000	0.0000000000
+			0.0000000000	0.0025 	0.0000000000
+			0.0000000000	0.0000000000	0.0003
+		com		-0.0271839495	0.0277505879	-0.0414542613
+		meshfile mesh/main.stl
+	endsegment
+
+	// Markers
+		marker	MidMainG
+			parent	MainG
+			position	0	0	-0.1
+			technical 1
+		endmarker
+
+
+// Pour obtenir les valeurs de la cuisse 'Milieu', j'ai fait la moyenne des deux matrices de RT, multiplié par deux la masse, multipliée par 2 l'inertie en z de la cuisse (pt pas super bonne inertie :/)
+// Informations about CuisseM segment
+	// Segment
+	segment	CuisseM
+		parent	Pelvis
+		rotations	xy
+		RT
+			1  0  0  -0.00429149
+			0  1  0  0.02974073
+			0  0  1 -0.09228426
+			0.          0.          0.          1.        
+		mass	19.7458
+		inertia
+			0.1565	0.0000000000	0.0000000000
+			0.0000000000	0.1565 	0.0000000000
+			0.0000000000	0.0000000000	0.0764
+		com		 0         0    -0.1855
+		meshfile mesh/cuisse.stl
+
+	endsegment
+
+	// Markers
+		marker	base_cuisseM
+			parent	CuisseM
+			position	0	0	0
+			technical 1
+		endmarker
+		marker	top_jambeM
+			parent	CuisseM
+			position	0	0	-0.8025
+			technical 1
+		endmarker
+
+
+// Pour obtenir les valeurs de la jambe 'Milieu', j'ai multipliée par 2 l'inertie en z de la cuisse (pt pas super bonne inertie :/), enlevé la translation en x et y de RT
+// Informations about JambeM segment
+	// Segment
+	segment	JambeM
+		parent	CuisseM
+		RT
+			1	0	0	0
+			0	1	0	0
+			0	0	-1	-0.4030
+			0.0000000000	0.0000000000	0.0000000000	1.0000000000
+		mass	7.4604
+		inertia
+			0.0565	0.0000000000	0.0000000000
+			0.0000000000	0.0565	0.0000000000
+			0.0000000000	0.0000000000	0.0112
+		com		0         0    0.1732
+		meshfile mesh/jambe.stl
+
+	endsegment
+
+	// Markers
+		marker	GenouM_D
+			parent	JambeM
+			position	0.1	0	0.1
+			technical 1
+		endmarker
+		marker	GenouM_G
+			parent	JambeM
+			position	-0.1	0	0.1
+			technical 1
+		endmarker
+
+// Pour obtenir les valeurs de la jambe 'Milieu', pas changé l'inertie (pt pas super bonne inertie :/)
+// Informations about PiedM segment
+	// Segment
+	segment	PiedM
+		parent	JambeM
+		RT
+			-1	0	0	-0.0000731275
+			0	0	-1	0.0063187126
+			0	-1	0	0.3813371128
+			0.0000000000	0.0000000000	0.0000000000	1.0000000000
+		mass	2.4008
+		inertia
+			0.0077 	0.0000000000	0.0000000000
+			0.0000000000	0.0076 	0.0000000000
+			0.0000000000	0.0000000000	0.0009
+		com		0         0    0.0403
+		meshfile mesh/pied.stl
+	endsegment
+	
+		// Markers
+		marker	chevilleM
+			parent	PiedM
+			position	0	0	0
+			technical 1
+		endmarker
+		

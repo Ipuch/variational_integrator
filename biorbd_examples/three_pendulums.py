@@ -45,7 +45,7 @@ def three_pendulums(time: float = 1, time_step: float = 0.05, unit_test=False):
     # Variational integrator
     vi = VariationalIntegrator(
         biorbd_model=biorbd_casadi_model,
-        time_step=time_step,
+        nb_steps=int(time / time_step),
         time=time,
         constraints=fcn_constraint,
         jac=fcn_jacobian,
