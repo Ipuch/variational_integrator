@@ -68,6 +68,9 @@ class VariationalIntegrator:
         The list of symbolic variables needed for the integration.
     residuals: Function
         The residuals of the Newton descent.
+    debug_mode: bool
+        If the debug mode is activated the integrator will indicate where it stopped if it is because of the
+        Newton's method.
 
     Methods
     -------
@@ -135,6 +138,9 @@ class VariationalIntegrator:
             The initial guess approximation used.
         initial_guess_custom: np.ndarray | None
             The custom initial guess custom used if initial_guess_approximation == InitialGuessApproximation.CUSTOM.
+        debug_mode: bool
+            If the debug mode is activated the integrator will indicate where it stopped if it is because of the
+            Newton's method.
         """
         # Check `discrete_approximation` and `control_type`
         if discrete_approximation not in QuadratureRule:
@@ -226,7 +232,7 @@ class VariationalIntegrator:
 
         self.q0_num, self.q1_num, self.lambdas_0 = self._compute_initial_states(q_init.squeeze(), q_dot_init.squeeze())
 
-    def _compute_initial_states(self, q_init, q_dot_init):
+    def _compute_initial_states(self, q_init: np.ndarray, q_dot_init: np.ndarray) -> Tuple[DM, DM, DM | None]:
         """
         Compute the initial states of the system from the initial position and velocity.
 
@@ -239,12 +245,9 @@ class VariationalIntegrator:
 
         Returns
         -------
-        q0: DM
-            The initial position of the system.
-        q1: DM
-            The initial velocity of the system.
-        lambdas0: DM | None
-            The initial lagrange multipliers of the system if there are constraints, None otherwise.
+        (q0, q1, lambdas0): Tuple[DM, DM, DM | None]
+            `q0` is the initial position of the system. `q1` is the initial velocity of the system. `lambdas0` are the
+            initial lagrange multipliers of the system if there are constraints, None otherwise.
         """
         # Declare the MX variables
         q0 = MX.sym("q0", self.biorbd_model.nbQ(), 1)
@@ -301,7 +304,7 @@ class VariationalIntegrator:
 
         return DM(q_init), q1_opt, lambdas_0_opt
 
-    def _compute_final_velocity(self, q_penultimate, q_ultimate):
+    def _compute_final_velocity(self, q_penultimate: np.ndarray, q_ultimate: np.ndarray) -> Tuple[DM, DM | None]:
         """
         Compute the final velocity of the system from the initial position and velocity.
 
@@ -314,10 +317,8 @@ class VariationalIntegrator:
 
         Returns
         -------
-        qN_dot: DM
-            The final velocity of the system.
-        lambdasN: DM
-            The final lagrange multipliers of the system.
+        (qN_dot, lambdasN): Tuple[DM, DM | None]
+            `qNdot` is the final velocity of the system. `lambdasN` are he final lagrange multipliers of the system.
         """
         # Declare the MX variables
         qN = MX.sym("qN", self.biorbd_model.nbQ(), 1)
@@ -643,7 +644,7 @@ class VariationalIntegrator:
                     f"Discrete {self.discrete_approximation} is not implemented for {self.control_type}"
                 )
 
-    def _compute_initial_guess(self, q_prev, q_cur, u_cur, time_step):
+    def _compute_initial_guess(self, q_prev: DM, q_cur: DM, u_cur: np.ndarray, time_step: int) -> DM:
         """
         Compute the initial guess for the next time step.
 
@@ -656,31 +657,33 @@ class VariationalIntegrator:
         u_cur: np.ndarray
             The controls at the current time step.
         time_step: int
-            The current time step.
+            The current time step, i.e. iteration number.
 
         Returns
         -------
         q_guess: DM
             The initial guess for the next time step.
         """
-        q_cur_array = q_cur.toarray().squeeze()
-        q_prev_array = q_prev.toarray().squeeze()
         # The first three initial guesses are issued from https://arxiv.org/pdf/1609.02898.pdf (3.3).
         if self.initial_guess_approximation == InitialGuessApproximation.CURRENT:
-            q_guess = q_cur_array
+            q_guess = q_cur
         elif self.initial_guess_approximation == InitialGuessApproximation.EXPLICIT_EULER:
-            qdot_cur_array = 1 / self.time_step * (q_cur_array - q_prev_array)
-            q_guess = q_cur_array + self.time_step * qdot_cur_array
+            qdot_cur_array = 1 / self.time_step * (q_cur - q_prev)
+            q_guess = q_cur + self.time_step * qdot_cur_array
         elif self.initial_guess_approximation == InitialGuessApproximation.SEMI_IMPLICIT_EULER:
+            q_cur_array = q_cur.toarray().squeeze()
+            q_prev_array = q_prev.toarray().squeeze()
             qdot_cur_array = 1 / self.time_step * (q_cur_array - q_prev_array)
             u_cur_array = u_cur
             qddot_cur_array = self.biorbd_numpy_model.ForwardDynamics(
                 q_cur_array, qdot_cur_array, u_cur_array
             ).to_array()
             qdot_next_array = qdot_cur_array + self.time_step * qddot_cur_array
-            q_guess = q_cur_array + self.time_step * qdot_next_array
+            q_guess = DM(q_cur_array + self.time_step * qdot_next_array)
         # The following initial guess is issued from http://journals.cambridge.org/abstract_S096249290100006X (2.1.1).
         elif self.initial_guess_approximation == InitialGuessApproximation.LAGRANGIAN:
+            q_cur_array = q_cur.toarray().squeeze()
+            q_prev_array = q_prev.toarray().squeeze()
             D2_Ld_qprev_qcur = Function(
                 "D2_Ld_qprev_qcur",
                 [self.q_prev, self.q_cur],
@@ -688,13 +691,13 @@ class VariationalIntegrator:
             ).expand()
             pk = D2_Ld_qprev_qcur(q_prev_array, q_cur_array)
             M_inv = self.biorbd_numpy_model.massMatrixInverse(q_cur_array).to_array()
-            q_guess = q_cur + (M_inv @ pk * self.time_step).toarray()
+            q_guess = DM(q_cur + (M_inv @ pk * self.time_step).toarray())
         # It is also possible to give an array of initial guesses.
         elif self.initial_guess_approximation == InitialGuessApproximation.CUSTOM:
-            q_guess = self.initial_guess_custom[:, time_step]
+            q_guess = DM(self.initial_guess_custom[:, time_step])
         else:
             raise NotImplementedError(f"Initial guess {self.initial_guess_approximation} is not implemented yet.")
-        return DM(q_guess)
+        return q_guess
 
     def integrate(self):
         """
@@ -716,41 +719,74 @@ class VariationalIntegrator:
             lambdas_all = None
             lambdas_num = DM(np.zeros((0, self.nb_steps)))
 
-        for i in range(2, self.nb_steps):
-            if self.controls is not None:
-                u_prev = self.controls[:, i - 2]
-                u_cur = self.controls[:, i - 1]
-                u_next = self.controls[:, i]
-            else:
-                u_prev = None
-                u_cur = None
-                u_next = None
+        if self.debug_mode:
+            for i in range(2, self.nb_steps):
+                if self.controls is not None:
+                    u_prev = self.controls[:, i - 2]
+                    u_cur = self.controls[:, i - 1]
+                    u_next = self.controls[:, i]
+                else:
+                    u_prev = None
+                    u_cur = None
+                    u_next = None
 
-            # f(q_prev, q_cur, q_next) = 0, only q_next is unknown
-            ifcn = self._declare_residuals(q_prev, q_cur, control_prev=u_prev, control_cur=u_cur, control_next=u_next)
+                # f(q_prev, q_cur, q_next) = 0, only q_next is unknown
+                ifcn = self._declare_residuals(
+                    q_prev, q_cur, control_prev=u_prev, control_cur=u_cur, control_next=u_next
+                )
 
-            q_guess = self._compute_initial_guess(q_prev, q_cur, u_cur, i)
+                q_guess = self._compute_initial_guess(q_prev, q_cur, u_cur, i)
 
-            v_init = self._dispatch_to_v(q_guess, lambdas_num)
-            if self.debug_mode:
+                v_init = self._dispatch_to_v(q_guess, lambdas_num)
                 try:
                     v_opt = ifcn(v_init)
                 except RuntimeError:
                     print(f"The integration crashed at the {i}th time step because of the rootfinding.")
                     break
-            else:
+                q_next, lambdas_num = self._dispatch_to_q_lambdas(v_opt)
+
+                q_prev = q_cur
+                q_cur = q_next
+
+                # store the results
+                if self.constraints is not None:
+                    lambdas_all[:, i - 1] = lambdas_num.toarray().squeeze()
+                    q_all[:, i] = q_next.toarray().squeeze()
+                else:
+                    q_all[:, i] = q_next.toarray().squeeze()
+        else:
+            for i in range(2, self.nb_steps):
+                if self.controls is not None:
+                    u_prev = self.controls[:, i - 2]
+                    u_cur = self.controls[:, i - 1]
+                    u_next = self.controls[:, i]
+                else:
+                    u_prev = None
+                    u_cur = None
+                    u_next = None
+
+                # f(q_prev, q_cur, q_next) = 0, only q_next is unknown
+                ifcn = self._declare_residuals(
+                    q_prev, q_cur, control_prev=u_prev, control_cur=u_cur, control_next=u_next
+                )
+
+                q_guess = self._compute_initial_guess(q_prev, q_cur, u_cur, i)
+
+                v_init = self._dispatch_to_v(q_guess, lambdas_num)
+
                 v_opt = ifcn(v_init)
-            q_next, lambdas_num = self._dispatch_to_q_lambdas(v_opt)
 
-            q_prev = q_cur
-            q_cur = q_next
+                q_next, lambdas_num = self._dispatch_to_q_lambdas(v_opt)
 
-            # store the results
-            if self.constraints is not None:
-                lambdas_all[:, i - 1] = lambdas_num.toarray().squeeze()
-                q_all[:, i] = q_next.toarray().squeeze()
-            else:
-                q_all[:, i] = q_next.toarray().squeeze()
+                q_prev = q_cur
+                q_cur = q_next
+
+                # store the results
+                if self.constraints is not None:
+                    lambdas_all[:, i - 1] = lambdas_num.toarray().squeeze()
+                    q_all[:, i] = q_next.toarray().squeeze()
+                else:
+                    q_all[:, i] = q_next.toarray().squeeze()
 
         q_dot_final, lambda_final = self._compute_final_velocity(q_all[:, -2], q_all[:, -1])
 
@@ -775,7 +811,7 @@ class VariationalIntegrator:
             v = np.concatenate((v, lambdas), axis=0)
         return v
 
-    def _dispatch_to_q_lambdas(self, v: np.ndarray | DM) -> Tuple[np.ndarray | DM, np.ndarray | DM]:
+    def _dispatch_to_q_lambdas(self, v: np.ndarray | DM) -> Tuple[np.ndarray | DM, np.ndarray | DM | None]:
         """
         Dispatch the v to the correct format
 
