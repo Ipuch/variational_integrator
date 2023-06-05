@@ -155,7 +155,11 @@ class VariationalIntegrator:
         self.time_step = time / nb_steps
 
         self.constraints = constraints
-        self.jac = jac
+        q_sym = MX.sym("q", (biorbd_model.nbQ(), 1))
+        if jac is None:
+            self.jac = Function("no_constraint", [q_sym], [MX.zeros(q_init.shape)], ["q"], ["zero"]).expand()
+        else:
+            self.jac = Function("constraint_jacobian", [q_sym], [self.time_step * jac(q_sym)], ["q"], ["zero"]).expand()
         self.discrete_approximation = discrete_approximation
         self.control_type = control_type
         self.initial_guess_approximation = initial_guess_approximation
@@ -199,10 +203,6 @@ class VariationalIntegrator:
             raise RuntimeError("The variational integrator type is not recognized")
 
         # self.force_approximation = force_approximation
-
-        if jac is None:
-            q_sym = MX.sym("q", (biorbd_model.nbQ(), 1))
-            self.jac = Function("no_constraint", [q_sym], [MX.zeros(q_init.shape)], ["q"], ["zero"]).expand()
 
         self._declare_mx()
         self._declare_discrete_euler_lagrange_equations()
