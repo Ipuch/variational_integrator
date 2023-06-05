@@ -304,7 +304,7 @@ class VariationalIntegrator:
 
         return DM(q_init), q1_opt, lambdas_0_opt
 
-    def _compute_final_velocity(self, q_penultimate: np.ndarray, q_ultimate: np.ndarray) -> Tuple[DM, DM | None]:
+    def _compute_final_velocity(self, q_penultimate: np.ndarray, q_ultimate: np.ndarray) -> Tuple[DM | None, DM | None]:
         """
         Compute the final velocity of the system from the initial position and velocity.
 
@@ -319,65 +319,62 @@ class VariationalIntegrator:
         -------
         (qN_dot, lambdasN): Tuple[DM, DM | None]
             `qNdot` is the final velocity of the system. `lambdasN` are he final lagrange multipliers of the system.
+            If the system has holonomic constraints, we do not know how to compute the final velocity for now.
         """
-        # Declare the MX variables
-        qN = MX.sym("qN", self.biorbd_model.nbQ(), 1)
-        qN_dot = MX.sym("qN_dot", self.biorbd_model.nbQ(), 1)
-        qN_minus_1 = MX.sym("qN_minus_1", self.biorbd_model.nbQ(), 1)
-        fd_plus = MX.sym("fd_plus", self.biorbd_model.nbQ(), 1)
-
-        # The following equation as been calculated thanks to the paper "Discrete mechanics and optimal control for
-        # constrained systems" (https://onlinelibrary.wiley.com/doi/epdf/10.1002/oca.912), equations (14) and the
-        # indications given just before the equation (18) for p0 and pN.
-        D2_L_qN_qN_dot = transpose(jacobian(self.lagrangian(qN, qN_dot), qN_dot))
-        D2_Ld_qN_minus_1_qN = transpose(jacobian(self.discrete_lagrangian(qN_minus_1, qN), qN))
-        # The constraint term is added as in _discrete_euler_lagrange_equations
-        constraint_term = (
-            1 / 2 * transpose(self.jac(qN)) @ self.lambdas
-            if self.constraints is not None
-            else MX.zeros(self.biorbd_model.nbQ(), 1)
-        )
-        output = [-D2_L_qN_qN_dot + D2_Ld_qN_minus_1_qN - constraint_term + fd_plus]
-
-        final_states_fun = Function("final_velocity", [qN, qN_dot, qN_minus_1, fd_plus, self.lambdas], output).expand()
-
-        mx_residuals = final_states_fun(
-            q_ultimate,
-            qN_dot,
-            q_penultimate,
-            self.control_approximation(self.controls[:, -2], self.controls[:, -1]),
-            self.lambdas,
-        )
-        decision_variables = qN_dot
-
         if (
             self.variational_integrator_type == VariationalIntegratorType.CONSTRAINED_DISCRETE_EULER_LAGRANGE
             or self.variational_integrator_type == VariationalIntegratorType.FORCED_CONSTRAINED_DISCRETE_EULER_LAGRANGE
         ):
-            decision_variables = vertcat(decision_variables, self.lambdas)
-            mx_residuals = vertcat(mx_residuals, self.constraints(qN_dot))
+            return None, None
 
-        residuals = Function(
-            "final_states_residuals",
-            [decision_variables],
-            [mx_residuals],
-        ).expand()
-
-        # Create an implicit function instance to solve the system of equations
-        opts = {"abstol": self.newton_descent_tolerance}
-        ifcn = rootfinder("ifcn", "newton", residuals, opts)
-
-        if self.constraints is not None:
-            lambdas_all = np.zeros((self.constraints.nnz_out(), self.nb_steps))
-            lambdas_num = lambdas_all[:, 0]
         else:
-            lambdas_num = np.zeros((0, self.nb_steps))
+            # Declare the MX variables
+            qN = MX.sym("qN", self.biorbd_model.nbQ(), 1)
+            qN_dot = MX.sym("qN_dot", self.biorbd_model.nbQ(), 1)
+            qN_minus_1 = MX.sym("qN_minus_1", self.biorbd_model.nbQ(), 1)
+            fd_plus = MX.sym("fd_plus", self.biorbd_model.nbQ(), 1)
 
-        v_init = self._dispatch_to_v((q_ultimate - q_penultimate) / self.time_step, lambdas_num)
-        v_opt = ifcn(v_init)
-        qN_dot_opt, lambdasN_opt = self._dispatch_to_q_lambdas(v_opt)
+            # The following equation as been calculated thanks to the paper "Discrete mechanics and optimal control for
+            # constrained systems" (https://onlinelibrary.wiley.com/doi/epdf/10.1002/oca.912), equations (14) and the
+            # indications given just before the equation (18) for p0 and pN.
+            D2_L_qN_qN_dot = transpose(jacobian(self.lagrangian(qN, qN_dot), qN_dot))
+            D2_Ld_qN_minus_1_qN = transpose(jacobian(self.discrete_lagrangian(qN_minus_1, qN), qN))
+            # The constraint term is added as in _discrete_euler_lagrange_equations
+            constraint_term = (
+                1 / 2 * transpose(self.jac(qN)) @ self.lambdas
+                if self.constraints is not None
+                else MX.zeros(self.biorbd_model.nbQ(), 1)
+            )
+            output = [-D2_L_qN_qN_dot + D2_Ld_qN_minus_1_qN - constraint_term + fd_plus]
 
-        return qN_dot_opt, lambdasN_opt
+            final_states_fun = Function(
+                "final_velocity", [qN, qN_dot, qN_minus_1, fd_plus, self.lambdas], output
+            ).expand()
+
+            mx_residuals = final_states_fun(
+                q_ultimate,
+                qN_dot,
+                q_penultimate,
+                self.control_approximation(self.controls[:, -2], self.controls[:, -1]),
+                self.lambdas,
+            )
+            decision_variables = qN_dot
+
+            residuals = Function(
+                "final_states_residuals",
+                [decision_variables],
+                [mx_residuals],
+            ).expand()
+
+            # Create an implicit function instance to solve the system of equations
+            opts = {"abstol": self.newton_descent_tolerance}
+            ifcn = rootfinder("ifcn", "newton", residuals, opts)
+
+            v_init = self._dispatch_to_v((q_ultimate - q_penultimate) / self.time_step, np.zeros((0, self.nb_steps)))
+            v_opt = ifcn(v_init)
+            qN_dot_opt, lambdasN_opt = self._dispatch_to_q_lambdas(v_opt)
+
+            return qN_dot_opt, lambdasN_opt
 
     def _declare_mx(self):
         """
@@ -790,10 +787,10 @@ class VariationalIntegrator:
 
         q_dot_final, lambda_final = self._compute_final_velocity(q_all[:, -2], q_all[:, -1])
 
-        if self.constraints is not None:
-            lambdas_all[:, -1] = lambda_final.toarray().squeeze()
+        if self.constraints is None:
+            q_dot_final = q_dot_final.toarray().squeeze()
 
-        return q_all, lambdas_all, q_dot_final.toarray().squeeze()
+        return q_all, lambdas_all, q_dot_final
 
     def _dispatch_to_v(self, q: np.ndarray | DM, lambdas: np.ndarray | DM) -> np.ndarray | DM:
         """

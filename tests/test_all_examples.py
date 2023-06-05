@@ -47,7 +47,7 @@ def test_pendulum():
 def test_one_pendulum():
     module = load_module(biorbd_examples_folder() + "/one_pendulum.py")
 
-    q_vi, q_vi_dot = module.one_pendulum(time=10, time_step=0.05)
+    q_vi, _ = module.one_pendulum(time=10, time_step=0.05)
 
     np.testing.assert_almost_equal(
         q_vi[:, -1],
@@ -55,27 +55,15 @@ def test_one_pendulum():
         decimal=13,
     )
 
-    np.testing.assert_almost_equal(
-        q_vi_dot,
-        [0.0, 0.0, -3.774176684457794],
-        decimal=13,
-    )
-
 
 def test_one_pendulum_force():
     module = load_module(biorbd_examples_folder() + "/one_pendulum_force.py")
 
-    q_vi, q_vi_dot = module.one_pendulum_force(time=10, time_step=0.05)
+    q_vi, _ = module.one_pendulum_force(time=10, time_step=0.05)
 
     np.testing.assert_almost_equal(
         q_vi[:, -1],
         [0.0, 0.0, -0.177363694419747],
-        decimal=13,
-    )
-
-    np.testing.assert_almost_equal(
-        q_vi_dot,
-        [0.0, 0.0, -4.084879154646298],
         decimal=13,
     )
 
@@ -118,7 +106,7 @@ def test_double_pendulum():
 def test_two_pendulums():
     module = load_module(biorbd_examples_folder() + "/two_pendulums.py")
 
-    q_vi, q_vi_dot = module.two_pendulums(time=10, time_step=0.05)
+    q_vi, _ = module.two_pendulums(time=10, time_step=0.05)
 
     np.testing.assert_almost_equal(
         q_vi[:, -1],
@@ -126,17 +114,11 @@ def test_two_pendulums():
         decimal=11,
     )
 
-    np.testing.assert_almost_equal(
-        q_vi_dot,
-        [-5.763506918114953, 0.496601012013394, -0.867978936879964, -6.511856255514687],
-        decimal=11,
-    )
-
 
 def test_three_pendulums():
     module = load_module(biorbd_examples_folder() + "/three_pendulums.py")
 
-    q_vi, q_vi_dot = module.three_pendulums(time=1, time_step=0.05)
+    q_vi, _ = module.three_pendulums(time=1, time_step=0.05)
 
     np.testing.assert_almost_equal(
         q_vi[:, -1],
@@ -148,20 +130,6 @@ def test_three_pendulums():
             -0.133194652725969,
             -1.995511842877902,
             -0.757376202440198,
-        ],
-        decimal=6,
-    )
-
-    np.testing.assert_almost_equal(
-        q_vi_dot,
-        [
-            -2.089745389170822,
-            -0.868340890373009,
-            0.495967839790253,
-            -5.383952434994377,
-            -0.085491065483457,
-            -0.126242857377834,
-            -9.097887185615036,
         ],
         decimal=6,
     )
