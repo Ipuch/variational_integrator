@@ -94,7 +94,7 @@ def one_pendulum(time: float = 10, time_step: float = 0.05, unit_test: bool = Fa
         plt.show()
 
         np.set_printoptions(formatter={"float": lambda x: "{0:0.15f}".format(x)})
-        print(q_vi[:, -1], q_vi_dot)
+        print(q_vi[:, -1])
 
     return q_vi, q_vi_dot
 
