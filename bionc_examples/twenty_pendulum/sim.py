@@ -11,7 +11,8 @@ import numpy as np
 from scipy.integrate import solve_ivp
 import time as t
 from .utils import RK4
-from varint import NaturalVariationalIntegrator as VariationalIntegrator
+# from varint import NaturalVariationalIntegrator as VariationalIntegrator
+from varint.natural_variational_integrator import VariationalIntegrator as VariationalIntegrator
 from varint import QuadratureRule
 
 
@@ -316,15 +317,15 @@ class VariationalSim:
         else:
             self.all_q_t0 = all_q_t0
 
-        if all_q_t1 is None:
-            tuple_of_Q = [
-                SegmentNaturalCoordinates.from_components(u=[1, 0, 0], rp=[0, -i, 0], rd=[0, -i - 1, 0], w=[0, 0, 1])
-                for i in range(0, self.biomodel.nb_segments)
-            ]
-            Q = NaturalCoordinates.from_qi(tuple(tuple_of_Q))
-            self.all_q_t1 = Q
-        else:
-            self.all_q_t1 = all_q_t1
+        # if all_q_t1 is None:
+        #     tuple_of_Q = [
+        #         SegmentNaturalCoordinates.from_components(u=[1, 0, 0], rp=[0, -i, 0], rd=[0, -i - 1, 0], w=[0, 0, 1])
+        #         for i in range(0, self.biomodel.nb_segments)
+        #     ]
+        #     Q = NaturalCoordinates.from_qi(tuple(tuple_of_Q))
+        #     self.all_q_t1 = Q
+        # else:
+        #     self.all_q_t1 = all_q_t1
 
         results_col = [
             "time",
@@ -347,67 +348,69 @@ class VariationalSim:
         self.results["time_steps"] = np.arange(0, self.final_time, self.dt)
 
         vi = VariationalIntegrator(
-            biomodel=self.biomodel,
-            time_step=self.dt,
+            biorbd_model=self.biomodel,
+            nb_steps=int(self.final_time / self.dt),
             time=self.final_time,
-            discrete_lagrangian_approximation=QuadratureRule.TRAPEZOIDAL,
-            q_init=np.concatenate((self.all_q_t0[:, np.newaxis], self.all_q_t1[:, np.newaxis]), axis=1),
+            discrete_approximation=QuadratureRule.TRAPEZOIDAL,
+            q_init=self.all_q_t0[:, np.newaxis],
+            q_dot_init=np.zeros((self.biomodel.nb_Q, 1)),
+            newton_descent_tolerance=1e-10,
         )
         tic0 = t.time()
-        self.results["q"], self.results["lagrange_multipliers"] = vi.integrate()
+        self.results["q"], self.results["lagrange_multipliers"], _ = vi.integrate()
         tic_end = t.time()
         print("Variational Integrator took {} seconds".format(tic_end - tic0))
         self.results["time"] = tic_end - tic0
 
-        self.discrete_energy_function = Function(
-            "energy",
-            [vi.q_cur, vi.q_next],
-            [
-                vi.discrete_function(function=self.biomodel.energy, q1=vi.q_cur, q2=vi.q_next),
-            ],
-        ).expand()
-
-        self.discrete_kinetic_energy_function = Function(
-            "kinetic_energy",
-            [vi.q_cur, vi.q_next],
-            [
-                vi.discrete_function(
-                    function=lambda q, qdot: self.biomodel.kinetic_energy(qdot), q1=vi.q_cur, q2=vi.q_next
-                ),
-            ],
-        ).expand()
-
-        self.discrete_potential_energy_function = Function(
-            "potential_energy",
-            [vi.q_cur, vi.q_next],
-            [
-                vi.discrete_function(
-                    function=lambda q, qdot: self.biomodel.potential_energy(q), q1=vi.q_cur, q2=vi.q_next
-                ),
-            ],
-        ).expand()
-
-        self.discrete_rigid_body_constraint_function = Function(
-            "Phi_r",
-            [vi.q_cur, vi.q_next],
-            [
-                vi.discrete_function(
-                    function=lambda q, qdot: self.biomodel.rigid_body_constraints(q), q1=vi.q_cur, q2=vi.q_next
-                ),
-            ],
-        ).expand()
-        self.discrete_joint_constraint_function = Function(
-            "Phi_j",
-            [vi.q_cur, vi.q_next],
-            [
-                vi.discrete_function(
-                    function=lambda q, qdot: self.biomodel.joint_constraints(q), q1=vi.q_cur, q2=vi.q_next
-                ),
-            ],
-        ).expand()
-
-        self.compute_energy()
-        self.compute_constraints()
+        # self.discrete_energy_function = Function(
+        #     "energy",
+        #     [vi.q_cur, vi.q_next],
+        #     [
+        #         vi.discrete_function(function=self.biomodel.energy, q1=vi.q_cur, q2=vi.q_next),
+        #     ],
+        # ).expand()
+        #
+        # self.discrete_kinetic_energy_function = Function(
+        #     "kinetic_energy",
+        #     [vi.q_cur, vi.q_next],
+        #     [
+        #         vi.discrete_function(
+        #             function=lambda q, qdot: self.biomodel.kinetic_energy(qdot), q1=vi.q_cur, q2=vi.q_next
+        #         ),
+        #     ],
+        # ).expand()
+        #
+        # self.discrete_potential_energy_function = Function(
+        #     "potential_energy",
+        #     [vi.q_cur, vi.q_next],
+        #     [
+        #         vi.discrete_function(
+        #             function=lambda q, qdot: self.biomodel.potential_energy(q), q1=vi.q_cur, q2=vi.q_next
+        #         ),
+        #     ],
+        # ).expand()
+        #
+        # self.discrete_rigid_body_constraint_function = Function(
+        #     "Phi_r",
+        #     [vi.q_cur, vi.q_next],
+        #     [
+        #         vi.discrete_function(
+        #             function=lambda q, qdot: self.biomodel.rigid_body_constraints(q), q1=vi.q_cur, q2=vi.q_next
+        #         ),
+        #     ],
+        # ).expand()
+        # self.discrete_joint_constraint_function = Function(
+        #     "Phi_j",
+        #     [vi.q_cur, vi.q_next],
+        #     [
+        #         vi.discrete_function(
+        #             function=lambda q, qdot: self.biomodel.joint_constraints(q), q1=vi.q_cur, q2=vi.q_next
+        #         ),
+        #     ],
+        # ).expand()
+        #
+        # self.compute_energy()
+        # self.compute_constraints()
         # self.compute_constraint_derivative()
 
     def compute_energy(self):
