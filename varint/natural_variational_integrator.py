@@ -184,7 +184,7 @@ class VariationalIntegrator:
         # Check the type of variational integrator
         if controls is None and forces is None:
             self.variational_integrator_type = VariationalIntegratorType.CONSTRAINED_DISCRETE_EULER_LAGRANGE
-        elif (controls is not None or forces is None):
+        elif controls is not None or forces is None:
             self.variational_integrator_type = VariationalIntegratorType.FORCED_CONSTRAINED_DISCRETE_EULER_LAGRANGE
         else:
             raise RuntimeError("The variational integrator type is not recognized")
@@ -208,7 +208,7 @@ class VariationalIntegrator:
 
         # `check constraints`
         if not ignore_initial_constraints:
-            res = Function("res",[],[self.biomodel.holonomic_constraints(q_init)])()['o0']
+            res = Function("res", [], [self.biomodel.holonomic_constraints(q_init)])()["o0"]
             if not np.allclose(res, np.zeros((self.biomodel.nb_holonomic_constraints, 1)), atol=1e-10):
                 raise ValueError("The initial position does not respect the constraints.")
 
@@ -271,7 +271,13 @@ class VariationalIntegrator:
         ).expand()
 
         # Create an implicit function instance to solve the system of equations
-        opts = {"abstol": self.newton_descent_tolerance, "print_time": True, "print_out": True, "print_in": False, "verbose": True}
+        opts = {
+            "abstol": self.newton_descent_tolerance,
+            "print_time": True,
+            "print_out": True,
+            "print_in": False,
+            "verbose": True,
+        }
         ifcn = rootfinder("ifcn", "newton", residuals, opts)
 
         if self.constraints is not None:
@@ -650,9 +656,7 @@ class VariationalIntegrator:
             qdot_cur_array = 1 / self.time_step * (q_cur - q_prev)
             q_guess = q_cur + self.time_step * qdot_cur_array
         elif self.initial_guess_approximation == InitialGuessApproximation.SEMI_IMPLICIT_EULER:
-            raise NotImplementedError(
-                f"Discrete {self.initial_guess_approximation} is not implemented."
-            )
+            raise NotImplementedError(f"Discrete {self.initial_guess_approximation} is not implemented.")
             # q_cur_array = q_cur.toarray().squeeze()
             # q_prev_array = q_prev.toarray().squeeze()
             # qdot_cur_array = 1 / self.time_step * (q_cur_array - q_prev_array)
@@ -664,9 +668,7 @@ class VariationalIntegrator:
             # q_guess = DM(q_cur_array + self.time_step * qdot_next_array)
         # The following initial guess is issued from http://journals.cambridge.org/abstract_S096249290100006X (2.1.1).
         elif self.initial_guess_approximation == InitialGuessApproximation.LAGRANGIAN:
-            raise NotImplementedError(
-                f"Discrete {self.initial_guess_approximation} is not implemented."
-            )
+            raise NotImplementedError(f"Discrete {self.initial_guess_approximation} is not implemented.")
             # q_cur_array = q_cur.toarray().squeeze()
             # q_prev_array = q_prev.toarray().squeeze()
             # D2_Ld_qprev_qcur = Function(

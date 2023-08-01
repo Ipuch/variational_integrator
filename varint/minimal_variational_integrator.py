@@ -341,9 +341,7 @@ class VariationalIntegrator:
         )
         output = [-D2_L_qN_qN_dot + D2_Ld_qN_minus_1_qN - constraint_term + fd_plus]
 
-        final_states_fun = Function(
-            "final_velocity", [qN, qN_dot, qN_minus_1, fd_plus, self.lambdas], output
-        ).expand()
+        final_states_fun = Function("final_velocity", [qN, qN_dot, qN_minus_1, fd_plus, self.lambdas], output).expand()
 
         mx_residuals = final_states_fun(
             q_ultimate,
@@ -372,9 +370,9 @@ class VariationalIntegrator:
         ifcn = rootfinder("ifcn", "newton", residuals, opts)
 
         if self.constraints is not None:
-            lambdas_num = np.zeros((self.constraints.nnz_out(), ))
+            lambdas_num = np.zeros((self.constraints.nnz_out(),))
         else:
-            lambdas_num = np.zeros((0, ))
+            lambdas_num = np.zeros((0,))
 
         v_init = self._dispatch_to_v((q_ultimate - q_penultimate) / self.time_step, lambdas_num)
         v_opt = ifcn(v_init)
