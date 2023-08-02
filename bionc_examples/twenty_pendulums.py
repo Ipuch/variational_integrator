@@ -116,7 +116,7 @@ def twenty_pendulum():
     nb_segments = biomodel.nb_segments
     print(f"Number of segments: {nb_segments}")
 
-    time = 15
+    time = 0.4
     dt = 0.04
 
     results = pd.DataFrame(
@@ -139,8 +139,25 @@ def twenty_pendulum():
         ]
     )
 
-    # sim_rk4 = StandardSim(biomodel, final_time=time, dt=dt, RK="RK4")
-    # sim_rk45 = StandardSim(biomodel, final_time=1.2, dt=dt, RK="RK45")
+    sim_rk4 = StandardSim(biomodel, final_time=time, dt=dt, RK="RK4")
+    sim_rk45 = StandardSim(biomodel, final_time=time, dt=dt, RK="RK45")
+
+    # viz = bionc.vizualization.animations.Viz(
+    #     biomodel,
+    #     background_color=(1, 1, 1),
+    #     show_natural_mesh=True,
+    #     window_size=(1800, 900),
+    #     camera_position=(41.22295145870256, 0.07359041918618726, -9.019234652667775),
+    #     camera_focus_point=(
+    #         0.6036061985552914, -0.227817999898422, -9.198309631280022),
+    #     camera_zoom=0.09498020579891492,
+    #     camera_roll=-90.0,
+    # )
+    # q = sim_rk45.results["q"][: biomodel.nb_Q, :]
+    # viz.animate(bionc.NaturalCoordinates(q),
+    #             None,
+    #             frame_rate=1 / dt,
+    #             )
 
     # sim_rk4.plot_Q()
     # sim_rk45.plot_Q()
@@ -149,44 +166,128 @@ def twenty_pendulum():
     # sim_rk4.plot_energy()
     # sim_rk45.plot_energy()
     # plt.show()
-    #
+    # #
     # print(f"Energy at t=0: {sim_rk4.results['Etot'][0]}")
     # print(f"Energy at t=1: {sim_rk4.results['Etot'][-1]}")
     #
-    # # print(f"Rigidbody Constraint at t=0: {sim_rk4.results['Phi_r'][:, 0]}")
-    # print(f"Rigidbody Constraint at t=end, min: {sim_rk4.results['Phi_r'][:, -1].min()}")
-    # print(f"Rigidbody Constraint at t=end, max: {sim_rk4.results['Phi_r'][:, -1].max()}")
-    # # print(f"Rigidbody Constraint at t=end, median: {sim_rk4.results['Phi_r'][:, -1].median()}")
-    #
-    # # print(f"Joint Constraint at t=0: {sim_rk4.results['Phi_j'][:, 0]}")
-    # print(f"Joint Constraint at t=end, min: {sim_rk4.results['Phi_j'][:, -1].min()}")
-    # print(f"Joint Constraint at t=end, max: {sim_rk4.results['Phi_j'][:, -1].max()}")
-    # # print(f"Joint Constraint at t=end, median: {sim_rk4.results['Phi_j'][:, -1].median()}")
-    #
+    print(f"Rigidbody Constraint at t=0: {sim_rk4.results['Phi_r'][:, 0]}")
+    print(f"Rigidbody Constraint at t=end, min: {sim_rk4.results['Phi_r'][:, -1].min()}")
+    print(f"Rigidbody Constraint at t=end, max: {sim_rk4.results['Phi_r'][:, -1].max()}")
+    print(f"Rigidbody Constraint at t=end, median: {np.median(sim_rk4.results['Phi_r'][:, -1])}")
+
+    print(f"Rigidbody Constraint at t=0: {sim_rk4.results['Phi_r'][:, 0]}")
+    print(f"Absolute Rigidbody Constraint at t=end, min: {np.abs(sim_rk4.results['Phi_r'][:, -1]).min()}")
+    print(f"Absolute Rigidbody Constraint at t=end, max: {np.abs(sim_rk4.results['Phi_r'][:, -1]).max()}")
+    print(f"Absolute Rigidbody Constraint at t=end, median: {np.median(np.abs(sim_rk4.results['Phi_r'][:, -1]))}")
+
+    print(f"Joint Constraint at t=0: {sim_rk4.results['Phi_j'][:, 0]}")
+    print(f"Joint Constraint at t=end, min: {sim_rk4.results['Phi_j'][:, -1].min()}")
+    print(f"Joint Constraint at t=end, max: {sim_rk4.results['Phi_j'][:, -1].max()}")
+    print(f"Joint Constraint at t=end, median: {np.median(sim_rk4.results['Phi_j'][:, -1])}")
+
+    # RK45
+    print(f"Absolute Joint Constraint at t=0: {sim_rk45.results['Phi_j'][:, 0]}")
+    print(f"Absolute Joint Constraint at t=end, min: {np.abs(sim_rk45.results['Phi_j'][:, -1]).min()}")
+    print(f"Absolute Joint Constraint at t=end, max: {np.abs(sim_rk45.results['Phi_j'][:, -1]).max()}")
+    print(f"Absolute Joint Constraint at t=end, median: {np.median(np.abs(sim_rk45.results['Phi_j'][:, -1]))}")
+
+    print(f"Rigidbody Constraint at t=0: {sim_rk45.results['Phi_r'][:, 0]}")
+    print(f"Rigidbody Constraint at t=end, min: {sim_rk45.results['Phi_r'][:, -1].min()}")
+    print(f"Rigidbody Constraint at t=end, max: {sim_rk45.results['Phi_r'][:, -1].max()}")
+    print(f"Rigidbody Constraint at t=end, median: {np.median(sim_rk45.results['Phi_r'][:, -1])}")
+
+    print(f"Rigidbody Constraint at t=0: {sim_rk45.results['Phi_r'][:, 0]}")
+    print(f"Absolute Rigidbody Constraint at t=end, min: {np.abs(sim_rk45.results['Phi_r'][:, -1]).min()}")
+    print(f"Absolute Rigidbody Constraint at t=end, max: {np.abs(sim_rk45.results['Phi_r'][:, -1]).max()}")
+    print(f"Absolute Rigidbody Constraint at t=end, median: {np.abs(np.median(sim_rk45.results['Phi_r'][:, -1]))}")
+
+    print(f"Joint Constraint at t=0: {sim_rk45.results['Phi_j'][:, 0]}")
+    print(f"Joint Constraint at t=end, min: {sim_rk45.results['Phi_j'][:, -1].min()}")
+    print(f"Joint Constraint at t=end, max: {sim_rk45.results['Phi_j'][:, -1].max()}")
+    print(f"Joint Constraint at t=end, median: {np.median(sim_rk45.results['Phi_j'][:, -1])}")
+
+    print(f"Absolute Joint Constraint at t=0: {sim_rk45.results['Phi_j'][:, 0]}")
+    print(f"Absolute Joint Constraint at t=end, min: {np.abs(sim_rk45.results['Phi_j'][:, -1]).min()}")
+    print(f"Absolute Joint Constraint at t=end, max: {np.abs(sim_rk45.results['Phi_j'][:, -1]).max()}")
+    print(f"Absolute Joint Constraint at t=end, median: {np.abs(np.median(sim_rk45.results['Phi_j'][:, -1]))}")
+
     # all_q_t0 = sim_rk45.results["q"][: biomodel.nb_Q, 0:1]
     # # get the q at the second frame for the discrete euler lagrange equation
     # all_q_t1 = sim_rk45.results["q"][: biomodel.nb_Q, 1:2]
 
     # vi_sim = VariationalSim(casadi_biomodel, final_time=1.2, dt=dt, all_q_t0=all_q_t0, all_q_t1=all_q_t1)
-    vi_sim = VariationalSim(casadi_biomodel, final_time=15, dt=dt)
-    viz = bionc.vizualization.animations.Viz(biomodel, background_color=(1, 1, 1))
-    q = vi_sim.results["q"][: biomodel.nb_Q, :]
-    viz.animate(bionc.NaturalCoordinates(q), None, frame_rate=1 / dt)
-    vi_sim.plot_energy()
-    print(f"Energy at t=0: {vi_sim.results['Etot'][0]}")
-    print(f"Energy at t=end: {vi_sim.results['Etot'][-1]}")
+    tic = t.time()
+    vi_sim = VariationalSim(casadi_biomodel, final_time=time, dt=dt)
+    toc = t.time() - tic
+    print(f"VI: {toc}")
 
-    # print(f"Rigidbody Constraint at t=0: {vi_sim.results['Phi_r'][:, 0]}")
-    print(f"Rigidbody Constraint at t=end, min: {vi_sim.results['Phi_r'][:, -1].min()}")
-    print(f"Rigidbody Constraint at t=end, max: {vi_sim.results['Phi_r'][:, -1].max()}")
-    # print(f"Rigidbody Constraint at t=end, median: {vi_sim.results['Phi_r'][:, -1].median()}")
+    # viz = bionc.vizualization.animations.Viz(
+    #     biomodel,
+    #     background_color=(1, 1, 1),
+    #     show_natural_mesh=True,
+    #     window_size=(1800, 900),
+    #     camera_position=(41.22295145870256, 0.07359041918618726, -9.019234652667775),
+    #     camera_focus_point=(
+    #         0.6036061985552914, -0.227817999898422, -9.198309631280022),
+    #     camera_zoom=0.09498020579891492,
+    #     camera_roll=-90.0,
+    # )
+    # q = vi_sim.results["q"][: biomodel.nb_Q, :]
+    # viz.animate(bionc.NaturalCoordinates(q),
+    #             None,
+    #             frame_rate=1 / dt,
+    #             )
 
-    # print(f"Joint Constraint at t=0: {vi_sim.results['Phi_j'][:, 0]}")
-    print(f"Joint Constraint at t=end, min: {vi_sim.results['Phi_j'][:, -1].min()}")
-    print(f"Joint Constraint at t=end, max: {vi_sim.results['Phi_j'][:, -1].max()}")
-    # print(f"Joint Constraint at t=end, median: {vi_sim.results['Phi_j'][:, -1].median()}")
+    # vi_sim.plot_energy()
+    # print(f"Energy at t=0: {vi_sim.results['Etot'][0]}")
+    # print(f"Energy at t=end: {vi_sim.results['Etot'][-1]}")
+    #
+    # # print(f"Rigidbody Constraint at t=0: {vi_sim.results['Phi_r'][:, 0]}")
+    # print(f"Rigidbody Constraint at t=end, min: {vi_sim.results['Phi_r'][:, -1].min()}")
+    # print(f"Rigidbody Constraint at t=end, max: {vi_sim.results['Phi_r'][:, -1].max()}")
+    # # print(f"Rigidbody Constraint at t=end, median: {vi_sim.results['Phi_r'][:, -1].median()}")
+    #
+    # # print(f"Joint Constraint at t=0: {vi_sim.results['Phi_j'][:, 0]}")
+    # print(f"Joint Constraint at t=end, min: {vi_sim.results['Phi_j'][:, -1].min()}")
+    # print(f"Joint Constraint at t=end, max: {vi_sim.results['Phi_j'][:, -1].max()}")
+    # # print(f"Joint Constraint at t=end, median: {vi_sim.results['Phi_j'][:, -1].median()}")
 
-    vi_sim.plot_Q()
+    # display all the constraints in one graph
+    fig, (ax1, ax2) = plt.subplots(2)
+
+    ax1.plot(np.max(np.abs(sim_rk4.results["Phi_j"][:, :]), axis=0), color="blue")
+    ax2.plot(np.max(np.abs(sim_rk4.results["Phi_r"][:, :]), axis=0), color="blue", label="RK4")
+
+    ax1.plot(np.max(np.abs(sim_rk45.results["Phi_j"][:, :]), axis=0), color="red")
+    ax2.plot(np.max(np.abs(sim_rk45.results["Phi_r"][:, :]), axis=0), color="red", label="RK45")
+
+    ax1.plot(np.max(np.abs(vi_sim.results["Phi_j"][:, :]), axis=0), color="green")
+    ax2.plot(np.max(np.abs(vi_sim.results["Phi_r"][:, :]), axis=0), color="green", label="Variational Integrator")
+
+    ax1.set_yscale("log")
+    ax2.set_yscale("log")
+
+    ax1.set_title("Joint constraints")
+    ax2.set_title("Rigid-body constraints")
+
+    ax1.set_ylim([1e-22, 1])
+    ax2.set_ylim([1e-27, 1])
+
+    plt.legend()
+    plt.show()
+
+    fig, ax1 = plt.subplots(1)
+
+    ax1.plot(sim_rk4.results["E_tot"][:, :], color="blue", label="RK4")
+    ax1.plot(sim_rk45.results["E_tot"][:, :], color="red", label="RK45")
+    ax1.plot(vi_sim.results["E_tot"][:, :], color="green", label="Variational Integrator")
+
+    ax1.set_yscale("log")
+
+    ax1.set_ylim([1e-22, 1e3])
+
+    plt.legend()
+    plt.show()
 
 
 if __name__ == "__main__":

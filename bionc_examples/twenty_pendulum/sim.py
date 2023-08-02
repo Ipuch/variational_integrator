@@ -11,6 +11,7 @@ import numpy as np
 from scipy.integrate import solve_ivp
 import time as t
 from .utils import RK4
+
 # from varint import NaturalVariationalIntegrator as VariationalIntegrator
 from varint.natural_variational_integrator import VariationalIntegrator as VariationalIntegrator
 from varint import QuadratureRule
@@ -398,7 +399,7 @@ class VariationalSim:
         #             function=lambda q, qdot: self.biomodel.rigid_body_constraints(q), q1=vi.q_cur, q2=vi.q_next
         #         ),
         #     ],
-        # ).expand()
+        # # ).expand()
         # self.discrete_joint_constraint_function = Function(
         #     "Phi_j",
         #     [vi.q_cur, vi.q_next],
@@ -409,8 +410,8 @@ class VariationalSim:
         #     ],
         # ).expand()
         #
-        # self.compute_energy()
-        # self.compute_constraints()
+        self.compute_energy()
+        self.compute_constraints()
         # self.compute_constraint_derivative()
 
     def compute_energy(self):
@@ -422,13 +423,13 @@ class VariationalSim:
         self.results["Epot"] = np.zeros(len(self.results["time_steps"]))
 
         for i in range(len(self.results["time_steps"])):
-            self.results["Etot"][i] = self.discrete_energy_function(
+            self.results["Etot"][i] = self.biomodel.numpy_model.energy(
                 self.results["q"][:, i], self.results["q"][:, i + 1]
             )
-            self.results["Ekin"][i] = self.discrete_kinetic_energy_function(
+            self.results["Ekin"][i] = self.biomodel.numpy_model.kinetic_energy(
                 self.results["q"][:, i], self.results["q"][:, i + 1]
             )
-            self.results["Epot"][i] = self.discrete_potential_energy_function(
+            self.results["Epot"][i] = self.biomodel.numpy_model.potential_energy(
                 self.results["q"][:, i], self.results["q"][:, i + 1]
             )
 
@@ -453,19 +454,11 @@ class VariationalSim:
         self.results["Phi_r"] = np.zeros((self.biomodel.nb_rigid_body_constraints, len(self.results["time_steps"])))
         self.results["Phi_j"] = np.zeros((self.biomodel.nb_joint_constraints, len(self.results["time_steps"])))
         for i in range(len(self.results["time_steps"])):
-            self.results["Phi_r"][:, i] = (
-                self.discrete_rigid_body_constraint_function(
-                    NaturalCoordinates(self.results["q"][:, i]), NaturalCoordinates(self.results["q"][:, i + 1])
-                )
-                .toarray()
-                .squeeze()
+            self.results["Phi_r"][:, i] = self.biomodel.numpy_model.rigid_body_constraints(
+                NaturalCoordinates(self.results["q"][:, i])
             )
-            self.results["Phi_j"][:, i] = (
-                self.discrete_joint_constraint_function(
-                    NaturalCoordinates(self.results["q"][:, i]), NaturalCoordinates(self.results["q"][:, i + 1])
-                )
-                .toarray()
-                .squeeze()
+            self.results["Phi_j"][:, i] = self.biomodel.numpy_model.joint_constraints(
+                NaturalCoordinates(self.results["q"][:, i])
             )
 
     def plot_Q(self):
