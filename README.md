@@ -16,3 +16,5 @@ in IEEE Transactions on Robotics, vol. 25, no. 6, pp. 1249-1261, Dec. 2009, doi:
 - M. West, “Variational integrators,” Ph.D. dissertation, California Inst. Technol., Pasadena, CA, 2004. p 13
 https://thesis.library.caltech.edu/2492/1/west_thesis.pdf
 
+# Notes
+This project was used as a first stage to implement discrete mechanics and optimal control in [bioptim](https://github.com/pyomeca/bioptim).
